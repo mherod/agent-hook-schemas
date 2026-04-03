@@ -1,0 +1,53 @@
+{
+  "name": "agent-hook-schemas",
+  "version": "0.1.0",
+  "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Gemini CLI, Cursor).",
+  "type": "module",
+  "sideEffects": false,
+  "types": "./index.ts",
+  "module": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./claude": "./claude.ts",
+    "./claude-hooks-integration": "./claude-hooks-integration.ts",
+    "./codex": "./codex.ts",
+    "./common": "./common.ts",
+    "./cursor": "./cursor.ts",
+    "./gemini": "./gemini.ts",
+    "./gemini-hooks-integration": "./gemini-hooks-integration.ts"
+  },
+  "files": [
+    "*.ts",
+    "!*.test.ts"
+  ],
+  "keywords": [
+    "agent",
+    "claude-code",
+    "codex",
+    "cursor",
+    "gemini",
+    "hooks",
+    "schema",
+    "zod"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mherod/agent-hook-schemas.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mherod/agent-hook-schemas/issues"
+  },
+  "homepage": "https://github.com/mherod/agent-hook-schemas#readme",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}

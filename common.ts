@@ -1,0 +1,159 @@
+import { z } from "zod";
+
+/** Shared JSON object shape for MCP / OpenAI-style tool payloads. */
+export const JsonObjectSchema = z.record(z.string(), z.unknown());
+export type JsonObject = z.infer<typeof JsonObjectSchema>;
+
+export const PreToolPermissionDecisionSchema = z.enum(["allow", "deny", "ask", "defer"]);
+export type PreToolPermissionDecision = z.infer<typeof PreToolPermissionDecisionSchema>;
+
+/**
+ * Hook events that exist in both Claude Code and OpenAI Codex hook protocols.
+ * Claude adds many more events; Codex uses exactly this set.
+ */
+export const SharedHookEventNameSchema = z.enum([
+  "SessionStart",
+  "PreToolUse",
+  "PostToolUse",
+  "UserPromptSubmit",
+  "Stop",
+]);
+export type SharedHookEventName = z.infer<typeof SharedHookEventNameSchema>;
+
+/** Shared `tool_name` + `tool_input` on tool-shaped hook stdin (Claude + Codex). */
+export const ToolCallCoreSchema = z.object({
+  tool_name: z.string(),
+  tool_input: JsonObjectSchema,
+});
+export type ToolCallCore = z.infer<typeof ToolCallCoreSchema>;
+
+/**
+ * PreToolUse `hookSpecificOutput` / stdout fields documented for both platforms.
+ */
+export const SharedHookSpecificPreToolUseOutputSchema = z
+  .object({
+    hookEventName: z.literal("PreToolUse"),
+    permissionDecision: PreToolPermissionDecisionSchema,
+    permissionDecisionReason: z.string().optional(),
+    updatedInput: JsonObjectSchema.optional(),
+    additionalContext: z.string().optional(),
+  })
+  .strict();
+export type SharedHookSpecificPreToolUseOutput = z.infer<
+  typeof SharedHookSpecificPreToolUseOutputSchema
+>;
+
+/** Shared events that use only `hookEventName` + optional `additionalContext` on stdout (not PreToolUse). */
+export type SharedHookSpecificContextOnlyEventName = Exclude<SharedHookEventName, "PreToolUse">;
+
+export const SharedHookSpecificSessionStartOutputSchema = z
+  .object({
+    hookEventName: z.literal("SessionStart"),
+    additionalContext: z.string().optional(),
+  })
+  .strict();
+export type SharedHookSpecificSessionStartOutput = z.infer<
+  typeof SharedHookSpecificSessionStartOutputSchema
+>;
+
+/** PostToolUse `hookSpecificOutput`: Codex documents `additionalContext`; Claude may add MCP override. */
+export const SharedHookSpecificPostToolUseOutputSchema = z
+  .object({
+    hookEventName: z.literal("PostToolUse"),
+    additionalContext: z.string().optional(),
+    updatedMCPToolOutput: z.unknown().optional(),
+  })
+  .strict();
+export type SharedHookSpecificPostToolUseOutput = z.infer<
+  typeof SharedHookSpecificPostToolUseOutputSchema
+>;
+
+export const SharedHookSpecificUserPromptSubmitOutputSchema = z
+  .object({
+    hookEventName: z.literal("UserPromptSubmit"),
+    additionalContext: z.string().optional(),
+  })
+  .strict();
+export type SharedHookSpecificUserPromptSubmitOutput = z.infer<
+  typeof SharedHookSpecificUserPromptSubmitOutputSchema
+>;
+
+export const SharedHookSpecificStopOutputSchema = z
+  .object({
+    hookEventName: z.literal("Stop"),
+    additionalContext: z.string().optional(),
+  })
+  .strict();
+export type SharedHookSpecificStopOutput = z.infer<typeof SharedHookSpecificStopOutputSchema>;
+
+/**
+ * Strongly typed `hookSpecificOutput` for the Claude ∩ Codex event set (discriminated on `hookEventName`).
+ */
+export const SharedHookSpecificOutputSchema = z.discriminatedUnion("hookEventName", [
+  SharedHookSpecificPreToolUseOutputSchema,
+  SharedHookSpecificSessionStartOutputSchema,
+  SharedHookSpecificPostToolUseOutputSchema,
+  SharedHookSpecificUserPromptSubmitOutputSchema,
+  SharedHookSpecificStopOutputSchema,
+]);
+export type SharedHookSpecificOutput = z.infer<typeof SharedHookSpecificOutputSchema>;
+
+/** @param hookEventName Must not be `PreToolUse` — use {@link SharedHookSpecificPreToolUseOutputSchema} instead. */
+export function sharedHookSpecificAdditionalContextSchema<
+  const N extends SharedHookSpecificContextOnlyEventName,
+>(hookEventName: N) {
+  switch (hookEventName) {
+    case "SessionStart":
+      return SharedHookSpecificSessionStartOutputSchema;
+    case "PostToolUse":
+      return SharedHookSpecificPostToolUseOutputSchema;
+    case "UserPromptSubmit":
+      return SharedHookSpecificUserPromptSubmitOutputSchema;
+    case "Stop":
+      return SharedHookSpecificStopOutputSchema;
+    default: {
+      const _x: never = hookEventName;
+      return _x;
+    }
+  }
+}
+
+/**
+ * Top-level hook stdout fields common to Claude and Codex JSON
+ * (`continue`, `stopReason`, `systemMessage`, `suppressOutput`).
+ */
+export const SharedHookStdoutCommonFieldsSchema = z.object({
+  continue: z.boolean().optional(),
+  stopReason: z.string().optional(),
+  systemMessage: z.string().optional(),
+  suppressOutput: z.boolean().optional(),
+});
+export type SharedHookStdoutCommonFields = z.infer<typeof SharedHookStdoutCommonFieldsSchema>;
+
+export const HookShellSchema = z.enum(["bash", "powershell"]);
+
+export const HookHandlerCommonSchema = z.object({
+  if: z.string().optional(),
+  timeout: z.number().optional(),
+  statusMessage: z.string().optional(),
+  once: z.boolean().optional(),
+});
+
+/** Command hook handler shape shared by Claude and Codex `hooks.json`. */
+export const CommandHookHandlerSchema = HookHandlerCommonSchema.extend({
+  type: z.literal("command"),
+  command: z.string(),
+  async: z.boolean().optional(),
+  shell: HookShellSchema.optional(),
+});
+export type CommandHookHandler = z.infer<typeof CommandHookHandlerSchema>;
+
+/**
+ * Matcher group with command handlers only: the config overlap between Claude
+ * (which also allows http / prompt / agent) and Codex (command-only).
+ */
+export const SharedCommandMatcherGroupSchema = z.object({
+  matcher: z.string().optional(),
+  hooks: z.array(CommandHookHandlerSchema),
+});
+export type SharedCommandMatcherGroup = z.infer<typeof SharedCommandMatcherGroupSchema>;
