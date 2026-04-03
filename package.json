@@ -43,7 +43,8 @@
   "files": [
     "dist",
     "*.ts",
-    "!*.test.ts"
+    "!*.test.ts",
+    "!tsup.config.ts"
   ],
   "keywords": [
     "agent",
@@ -64,12 +65,13 @@
   },
   "homepage": "https://github.com/mherod/agent-hook-schemas#readme",
   "scripts": {
-    "build": "bun build --external=zod --target=node ./index.ts ./claude.ts ./claude-hooks-integration.ts ./codex.ts ./common.ts ./cursor.ts ./gemini.ts ./gemini-hooks-integration.ts --outdir=dist && tsc -p tsconfig.build.json",
+    "build": "tsup",
     "prepublishOnly": "bun run build",
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "tsup": "^8.5.1"
   },
   "peerDependencies": {
     "typescript": "^5"
