@@ -4,19 +4,44 @@
   "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Gemini CLI, Cursor).",
   "type": "module",
   "sideEffects": false,
-  "types": "./index.ts",
-  "module": "./index.ts",
+  "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
   "exports": {
-    ".": "./index.ts",
-    "./claude": "./claude.ts",
-    "./claude-hooks-integration": "./claude-hooks-integration.ts",
-    "./codex": "./codex.ts",
-    "./common": "./common.ts",
-    "./cursor": "./cursor.ts",
-    "./gemini": "./gemini.ts",
-    "./gemini-hooks-integration": "./gemini-hooks-integration.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./claude": {
+      "types": "./dist/claude.d.ts",
+      "import": "./dist/claude.js"
+    },
+    "./claude-hooks-integration": {
+      "types": "./dist/claude-hooks-integration.d.ts",
+      "import": "./dist/claude-hooks-integration.js"
+    },
+    "./codex": {
+      "types": "./dist/codex.d.ts",
+      "import": "./dist/codex.js"
+    },
+    "./common": {
+      "types": "./dist/common.d.ts",
+      "import": "./dist/common.js"
+    },
+    "./cursor": {
+      "types": "./dist/cursor.d.ts",
+      "import": "./dist/cursor.js"
+    },
+    "./gemini": {
+      "types": "./dist/gemini.d.ts",
+      "import": "./dist/gemini.js"
+    },
+    "./gemini-hooks-integration": {
+      "types": "./dist/gemini-hooks-integration.d.ts",
+      "import": "./dist/gemini-hooks-integration.js"
+    }
   },
   "files": [
+    "dist",
     "*.ts",
     "!*.test.ts"
   ],
@@ -39,6 +64,8 @@
   },
   "homepage": "https://github.com/mherod/agent-hook-schemas#readme",
   "scripts": {
+    "build": "bun build --external=zod --target=node ./index.ts ./claude.ts ./claude-hooks-integration.ts ./codex.ts ./common.ts ./cursor.ts ./gemini.ts ./gemini-hooks-integration.ts --outdir=dist && tsc -p tsconfig.build.json",
+    "prepublishOnly": "bun run build",
     "test": "bun test"
   },
   "devDependencies": {

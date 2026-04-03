@@ -175,8 +175,8 @@ describe("Gemini hooks (merge + resolve)", () => {
   });
 
   test("effectiveGeminiHandlerTimeoutMs defaults to 60000", () => {
-    expect(effectiveGeminiHandlerTimeoutMs({ type: "command", command: "x" })).toBe(60_000);
-    expect(effectiveGeminiHandlerTimeoutMs({ type: "command", command: "x", timeout: 5000 })).toBe(5000);
+    expect(effectiveGeminiHandlerTimeoutMs({ timeout: undefined })).toBe(60_000);
+    expect(effectiveGeminiHandlerTimeoutMs({ timeout: 5000 })).toBe(5000);
   });
 });
 

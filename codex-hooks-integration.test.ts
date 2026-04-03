@@ -226,7 +226,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
       model: "gpt-5",
       hook_event_name: "PreToolUse" as const,
       turn_id: "t1",
-      transcript_path: null as const,
+      transcript_path: null,
       permission_mode: "default" as const,
       tool_name: "Bash" as const,
       tool_use_id: "c1",

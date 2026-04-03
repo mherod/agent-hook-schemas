@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   HooksConfigSchema,
   ParseHookInput,
+  type CommandHookHandler,
   type HookHandler,
 } from "./claude.ts";
 import {
@@ -44,8 +45,8 @@ describe("mergeClaudeHooksFiles", () => {
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.config.PreToolUse).toHaveLength(2);
-      expect(r.config.PreToolUse?.[0]?.hooks[0]?.command).toBe("user.sh");
-      expect(r.config.PreToolUse?.[1]?.hooks[0]?.command).toBe("proj.sh");
+      expect((r.config.PreToolUse?.[0]?.hooks[0] as CommandHookHandler | undefined)?.command).toBe("user.sh");
+      expect((r.config.PreToolUse?.[1]?.hooks[0] as CommandHookHandler | undefined)?.command).toBe("proj.sh");
     }
   });
 
@@ -119,7 +120,7 @@ describe("resolveMatchingClaudeHandlers", () => {
       toolInput: { command: "git status" },
     };
     const handlers = resolveMatchingClaudeHandlers(config, "PreToolUse", ctx);
-    expect(handlers.map((h) => h.command)).toEqual(["a.sh", "b.sh", "always.sh"]);
+    expect(handlers.map((h) => (h as CommandHookHandler).command)).toEqual(["a.sh", "b.sh", "always.sh"]);
   });
 
   test("if excludes handler when command does not match", () => {
@@ -129,7 +130,7 @@ describe("resolveMatchingClaudeHandlers", () => {
       toolInput: { command: "ls" },
     };
     const handlers = resolveMatchingClaudeHandlers(config, "PreToolUse", ctx);
-    expect(handlers.map((h) => h.command)).toEqual(["a.sh", "always.sh"]);
+    expect(handlers.map((h) => (h as CommandHookHandler).command)).toEqual(["a.sh", "always.sh"]);
   });
 
   test("if on handler without tool context fails closed", () => {
@@ -165,7 +166,7 @@ describe("resolveMatchingClaudeHandlersFromInput", () => {
 
     const handlers = resolveMatchingClaudeHandlersFromInput(merged.config, stdin.data);
     expect(handlers).toHaveLength(1);
-    expect(handlers[0]?.command).toBe("fmt.sh");
+    expect((handlers[0] as CommandHookHandler | undefined)?.command).toBe("fmt.sh");
   });
 });
 
@@ -188,12 +189,10 @@ describe("claudeResolutionContextFromInput", () => {
 
 describe("effectiveClaudeHandlerTimeoutSec", () => {
   test("defaults to 600", () => {
-    expect(effectiveClaudeHandlerTimeoutSec({ type: "command", command: "x" })).toBe(600);
+    expect(effectiveClaudeHandlerTimeoutSec(cmd("x"))).toBe(600);
   });
 
   test("respects explicit timeout", () => {
-    expect(effectiveClaudeHandlerTimeoutSec({ type: "http", url: "http://x", timeout: 30 })).toBe(
-      30,
-    );
+    expect(effectiveClaudeHandlerTimeoutSec(cmd("x", { timeout: 30 }))).toBe(30);
   });
 });

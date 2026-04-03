@@ -156,68 +156,76 @@ export function claudeResolutionContextFromInput(input: HookEventInput): ClaudeH
 function toolContextFromInput(
   input: HookEventInput,
 ): { toolName?: string; toolInput?: Record<string, unknown> } {
-  switch (input.hook_event_name) {
+  // Zod v4 .loose() infers Record<string, unknown> via Prettify, erasing named property types.
+  // Cast to a plain discriminated shape so the switch and property reads type-check cleanly.
+  const i = input as { hook_event_name: HookEventName } & Record<string, unknown>;
+  switch (i.hook_event_name) {
     case "PreToolUse":
     case "PermissionRequest":
     case "PostToolUse":
     case "PostToolUseFailure":
     case "PermissionDenied":
-      return { toolName: input.tool_name, toolInput: input.tool_input };
+      return {
+        toolName: i.tool_name as string | undefined,
+        toolInput: i.tool_input as Record<string, unknown> | undefined,
+      };
     default:
       return {};
   }
 }
 
 function subjectForClaudeInput(input: HookEventInput): string {
-  switch (input.hook_event_name) {
+  // Same Zod v4 .loose() cast as toolContextFromInput — all props are unknown without it.
+  const i = input as { hook_event_name: HookEventName } & Record<string, unknown>;
+  switch (i.hook_event_name) {
     case "SessionStart":
-      return input.source;
+      return i.source as string;
     case "InstructionsLoaded":
-      return input.file_path;
+      return i.file_path as string;
     case "UserPromptSubmit":
-      return input.prompt;
+      return i.prompt as string;
     case "PreToolUse":
     case "PermissionRequest":
     case "PostToolUse":
     case "PostToolUseFailure":
     case "PermissionDenied":
-      return input.tool_name;
+      return i.tool_name as string;
     case "Notification":
-      return input.notification_type;
+      return i.notification_type as string;
     case "SubagentStart":
-      return input.agent_type;
+      return i.agent_type as string;
     case "SubagentStop":
-      return input.last_assistant_message;
+      return i.last_assistant_message as string;
     case "TaskCreated":
     case "TaskCompleted":
-      return input.task_subject;
+      return i.task_subject as string;
     case "Stop":
-      return input.last_assistant_message;
+      return i.last_assistant_message as string;
     case "StopFailure":
-      return input.error;
+      return i.error as string;
     case "TeammateIdle":
-      return input.teammate_name;
+      return i.teammate_name as string;
     case "ConfigChange":
-      return input.source;
+      return i.source as string;
     case "CwdChanged":
-      return input.new_cwd;
+      return i.new_cwd as string;
     case "FileChanged":
-      return input.file_path;
+      return i.file_path as string;
     case "WorktreeCreate":
-      return input.name;
+      return i.name as string;
     case "WorktreeRemove":
-      return input.worktree_path;
+      return i.worktree_path as string;
     case "PreCompact":
     case "PostCompact":
-      return input.trigger;
+      return i.trigger as string;
     case "SessionEnd":
-      return input.reason;
+      return i.reason as string;
     case "Elicitation":
-      return input.mcp_server_name;
+      return i.mcp_server_name as string;
     case "ElicitationResult":
-      return `${input.mcp_server_name}:${input.action}`;
+      return `${i.mcp_server_name as string}:${i.action as string}`;
     default: {
-      const _exhaustive: never = input;
+      const _exhaustive: never = i.hook_event_name;
       return _exhaustive;
     }
   }
@@ -230,7 +238,7 @@ export function resolveMatchingClaudeHandlersFromInput(
 ): HookHandler[] {
   return resolveMatchingClaudeHandlers(
     config,
-    input.hook_event_name,
+    (input as { hook_event_name: HookEventName }).hook_event_name,
     claudeResolutionContextFromInput(input),
   );
 }
