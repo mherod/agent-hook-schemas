@@ -2585,3 +2585,85 @@ describe("issue #1: Gemini notification_type accepts arbitrary strings", () => {
     expect(r.success).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Integration: Forward-compatible enum handling for downstream consumers
+// ---------------------------------------------------------------------------
+
+describe("issue #3: forward-compatible enums enable safe downstream parsing", () => {
+  test("downstream consumer can parse future permission_mode without version bump", () => {
+    // Simulates Claude Code v2.5 sending a new permission mode not yet in agent-hook-schemas
+    const futurePayload = {
+      ...claudeBase,
+      hook_event_name: "SessionStart",
+      source: "startup",
+      permission_mode: "restrictive_sandbox", // New mode from future version
+    };
+
+    const r = ParseHookInput(futurePayload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("SessionStart");
+      expect((r.data as Record<string, unknown>).permission_mode).toBe("restrictive_sandbox");
+    }
+  });
+
+  test("downstream consumer can parse future SessionStart source without version bump", () => {
+    const futurePayload = {
+      ...claudeBase,
+      hook_event_name: "SessionStart",
+      source: "ai_migration", // New source from future version
+    };
+
+    const r = ParseHookInput(futurePayload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect((r.data as Record<string, unknown>).source).toBe("ai_migration");
+    }
+  });
+
+  test("downstream consumer can parse future NotificationType without version bump", () => {
+    const futurePayload = {
+      ...claudeBase,
+      hook_event_name: "Notification",
+      notification_type: "security_alert", // New type from future version
+      message: "Security update required",
+    };
+
+    const r = ParseHookInput(futurePayload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect((r.data as Record<string, unknown>).notification_type).toBe("security_alert");
+    }
+  });
+
+  test("downstream consumer safely handles unknown hook event with fallback schema", () => {
+    const futurePayload = {
+      ...claudeBase,
+      hook_event_name: "FutureEvent", // Unknown event type from future Claude Code
+      custom_field: "value",
+    };
+
+    const r = ParseHookInput(futurePayload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("FutureEvent");
+      expect((r.data as Record<string, unknown>).custom_field).toBe("value");
+    }
+  });
+
+  test("Gemini: downstream consumer can parse future event without version bump", () => {
+    const futurePayload = {
+      session_id: "g1",
+      cwd: "/tmp",
+      timestamp: "2026-01-01T00:00:00Z",
+      hook_event_name: "FutureGeminiEvent",
+    };
+
+    const r = ParseGeminiHookInput(futurePayload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("FutureGeminiEvent");
+    }
+  });
+});
