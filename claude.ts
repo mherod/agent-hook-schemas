@@ -171,6 +171,7 @@ export const ClaudeCodeBuiltinToolNameSchema = z.enum([
   "TaskOutput",
   "TaskStop",
   "TaskUpdate",
+  "ToolSearch",
   "WebFetch",
   "WebSearch",
   "Write",
@@ -256,6 +257,63 @@ export const WebSearchToolInputSchema = z.object({
   blocked_domains: z.array(z.string()).optional(),
 });
 export type WebSearchToolInput = z.infer<typeof WebSearchToolInputSchema>;
+
+/** A single search result link returned inside {@link WebSearchToolResponseSchema}. */
+export const WebSearchResultLinkSchema = z
+  .object({
+    title: z.string(),
+    url: z.string(),
+  })
+  .loose();
+export type WebSearchResultLink = z.infer<typeof WebSearchResultLinkSchema>;
+
+/** Structured search result block containing links (first element of the `results` tuple). */
+export const WebSearchResultBlockSchema = z
+  .object({
+    tool_use_id: z.string().optional(),
+    content: z.array(WebSearchResultLinkSchema),
+  })
+  .loose();
+export type WebSearchResultBlock = z.infer<typeof WebSearchResultBlockSchema>;
+
+/**
+ * Response from the `WebSearch` built-in tool.
+ *
+ * `results` is a heterogeneous array: structured result blocks and AI-generated
+ * summary strings interleaved. Use {@link WebSearchResultBlockSchema} to narrow
+ * individual elements.
+ */
+export const WebSearchToolResponseSchema = z
+  .object({
+    query: z.string(),
+    results: z.array(z.union([WebSearchResultBlockSchema, z.string()])),
+    durationSeconds: z.number().optional(),
+  })
+  .loose();
+export type WebSearchToolResponse = z.infer<typeof WebSearchToolResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// ToolSearch tool input / response
+// ---------------------------------------------------------------------------
+
+/** Tool input for the `ToolSearch` built-in tool (deferred tool lookup). */
+export const ToolSearchToolInputSchema = z
+  .object({
+    query: z.string(),
+    max_results: z.number().optional(),
+  })
+  .loose();
+export type ToolSearchToolInput = z.infer<typeof ToolSearchToolInputSchema>;
+
+/** Response from the `ToolSearch` built-in tool. */
+export const ToolSearchToolResponseSchema = z
+  .object({
+    matches: z.array(z.string()),
+    query: z.string(),
+    total_deferred_tools: z.number().optional(),
+  })
+  .loose();
+export type ToolSearchToolResponse = z.infer<typeof ToolSearchToolResponseSchema>;
 
 export const AgentToolInputSchema = z.object({
   prompt: z.string(),

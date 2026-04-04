@@ -189,6 +189,25 @@ export const TaskStopToolInputSchema = z
 export type TaskStopToolInput = z.infer<typeof TaskStopToolInputSchema>;
 
 // ---------------------------------------------------------------------------
+// TaskToolInput: discriminated union keyed on tool_name
+// ---------------------------------------------------------------------------
+
+/**
+ * Discriminated union of all task-related tool inputs, keyed on `tool_name`.
+ * Useful in hooks that receive `{tool_name, tool_input}` and need to parse
+ * the input shape in one step based on the tool name.
+ */
+export const TaskToolInputSchema = z.discriminatedUnion("tool_name", [
+  z.object({ tool_name: z.literal("TaskCreate"), tool_input: TaskCreateToolInputSchema }),
+  z.object({ tool_name: z.literal("TaskUpdate"), tool_input: TaskUpdateToolInputSchema }),
+  z.object({ tool_name: z.literal("TaskList"), tool_input: TaskListToolInputSchema }),
+  z.object({ tool_name: z.literal("TaskGet"), tool_input: TaskGetToolInputSchema }),
+  z.object({ tool_name: z.literal("TaskOutput"), tool_input: TaskOutputToolInputSchema }),
+  z.object({ tool_name: z.literal("TaskStop"), tool_input: TaskStopToolInputSchema }),
+]);
+export type TaskToolInput = z.infer<typeof TaskToolInputSchema>;
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
