@@ -208,6 +208,18 @@ export const BashToolInputSchema = z.object({
 });
 export type BashToolInput = z.infer<typeof BashToolInputSchema>;
 
+/** Response from the `Bash` built-in tool. */
+export const BashToolResponseSchema = z
+  .object({
+    stdout: z.string(),
+    stderr: z.string(),
+    interrupted: z.boolean().optional(),
+    isImage: z.boolean().optional(),
+    noOutputExpected: z.boolean().optional(),
+  })
+  .loose();
+export type BashToolResponse = z.infer<typeof BashToolResponseSchema>;
+
 export const WriteToolInputSchema = z.object({
   file_path: z.string(),
   content: z.string(),
@@ -222,12 +234,55 @@ export const EditToolInputSchema = z.object({
 });
 export type EditToolInput = z.infer<typeof EditToolInputSchema>;
 
+/** Response from `Edit` when the file was modified. */
+export const EditToolResponseSchema = z
+  .object({
+    filePath: z.string(),
+    oldString: z.string(),
+    newString: z.string(),
+  })
+  .loose();
+export type EditToolResponse = z.infer<typeof EditToolResponseSchema>;
+
 export const ReadToolInputSchema = z.object({
   file_path: z.string(),
   offset: z.number().optional(),
   limit: z.number().optional(),
 });
 export type ReadToolInput = z.infer<typeof ReadToolInputSchema>;
+
+/** File content returned by `Read`. */
+export const ReadToolResponseTextSchema = z
+  .object({
+    type: z.literal("text"),
+    file: z
+      .object({
+        filePath: z.string(),
+        content: z.string(),
+        numLines: z.number().optional(),
+        startLine: z.number().optional(),
+        totalLines: z.number().optional(),
+      })
+      .loose(),
+  })
+  .loose();
+export type ReadToolResponseText = z.infer<typeof ReadToolResponseTextSchema>;
+
+/** Response when `Read` detects the file hasn't changed since last read. */
+export const ReadToolResponseUnchangedSchema = z
+  .object({
+    type: z.literal("file_unchanged"),
+    file: z.object({ filePath: z.string() }).loose(),
+  })
+  .loose();
+export type ReadToolResponseUnchanged = z.infer<typeof ReadToolResponseUnchangedSchema>;
+
+/** Discriminated response from the `Read` built-in tool. */
+export const ReadToolResponseSchema = z.discriminatedUnion("type", [
+  ReadToolResponseTextSchema,
+  ReadToolResponseUnchangedSchema,
+]);
+export type ReadToolResponse = z.infer<typeof ReadToolResponseSchema>;
 
 export const GlobToolInputSchema = z.object({
   pattern: z.string(),
@@ -244,6 +299,18 @@ export const GrepToolInputSchema = z.object({
   multiline: z.boolean().optional(),
 });
 export type GrepToolInput = z.infer<typeof GrepToolInputSchema>;
+
+/** Response from the `Grep` built-in tool. */
+export const GrepToolResponseSchema = z
+  .object({
+    mode: z.string().optional(),
+    numFiles: z.number().optional(),
+    filenames: z.array(z.string()).optional(),
+    content: z.string().optional(),
+    numLines: z.number().optional(),
+  })
+  .loose();
+export type GrepToolResponse = z.infer<typeof GrepToolResponseSchema>;
 
 export const WebFetchToolInputSchema = z.object({
   url: z.string(),
