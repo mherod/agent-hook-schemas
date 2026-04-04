@@ -1,9 +1,17 @@
 import { z } from "zod";
 import {
+  type GeminiAfterAgentInput,
+  type GeminiAfterToolInput,
+  type GeminiBeforeAgentInput,
+  type GeminiBeforeToolInput,
   type GeminiCommandHookHandler,
   type GeminiHookEventInput,
   type GeminiHookEventName,
   type GeminiHooksConfig,
+  type GeminiNotificationInput,
+  type GeminiPreCompressInput,
+  type GeminiSessionEndInput,
+  type GeminiSessionStartInput,
   type GeminiSettings,
   GeminiHookEventNameSchema,
   GeminiHooksConfigSchema,
@@ -84,24 +92,27 @@ export function resolveMatchingGeminiHandlers(
 }
 
 function subjectForGeminiInput(input: GeminiHookEventInput): string {
-  switch (input.hook_event_name) {
-    case "SessionStart":
-      return input.source ?? "";
-    case "SessionEnd":
-      return input.reason ?? "";
-    case "BeforeAgent":
-    case "AfterAgent":
-      return input.prompt ?? "";
-    case "BeforeTool":
-    case "AfterTool":
-      return input.tool_name ?? "";
-    case "PreCompress":
-      return input.trigger ?? "";
-    case "Notification":
-      return input.notification_type ?? "";
-    default:
-      return "";
+  // Handle known event types; forward-compatible enums allow unknown event names
+  if ("source" in input && input.hook_event_name === "SessionStart") {
+    return (input as GeminiSessionStartInput).source ?? "";
   }
+  if ("reason" in input && input.hook_event_name === "SessionEnd") {
+    return (input as GeminiSessionEndInput).reason ?? "";
+  }
+  if ("prompt" in input && (input.hook_event_name === "BeforeAgent" || input.hook_event_name === "AfterAgent")) {
+    return (input as GeminiBeforeAgentInput | GeminiAfterAgentInput).prompt ?? "";
+  }
+  if ("tool_name" in input && (input.hook_event_name === "BeforeTool" || input.hook_event_name === "AfterTool")) {
+    return (input as GeminiBeforeToolInput | GeminiAfterToolInput).tool_name ?? "";
+  }
+  if ("trigger" in input && input.hook_event_name === "PreCompress") {
+    return (input as GeminiPreCompressInput).trigger ?? "";
+  }
+  if ("notification_type" in input && input.hook_event_name === "Notification") {
+    return (input as GeminiNotificationInput).notification_type ?? "";
+  }
+  // Unknown event name: return empty string
+  return "";
 }
 
 /** Resolve handlers from merged config + parsed stdin payload. */
@@ -109,9 +120,12 @@ export function resolveMatchingGeminiHandlersFromInput(
   config: GeminiHooksConfig,
   input: GeminiHookEventInput,
 ): GeminiCommandHookHandler[] {
+  // Forward-compatible: hook_event_name accepts unknown strings via .or(z.string())
+  // Only known events produce handlers, unknown events safely return empty array
+  const eventName = input.hook_event_name as GeminiHookEventName;
   return resolveMatchingGeminiHandlers(
     config,
-    input.hook_event_name,
+    eventName,
     subjectForGeminiInput(input),
   );
 }
