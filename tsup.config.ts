@@ -8,6 +8,7 @@ export default defineConfig({
     "claude-tasks.ts",
     "codex.ts",
     "codex-hooks-integration.ts",
+    "codex-tasks.ts",
     "common.ts",
     "cursor.ts",
     "gemini.ts",

@@ -23,6 +23,10 @@
       "types": "./dist/codex.d.ts",
       "import": "./dist/codex.js"
     },
+    "./codex-tasks": {
+      "types": "./dist/codex-tasks.d.ts",
+      "import": "./dist/codex-tasks.js"
+    },
     "./codex-hooks-integration": {
       "types": "./dist/codex-hooks-integration.d.ts",
       "import": "./dist/codex-hooks-integration.js"

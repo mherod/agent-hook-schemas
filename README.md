@@ -164,6 +164,7 @@ const codexResult = CodexHooksFileSchema.safeParse(hooksJson);
 | `agent-hook-schemas/claude` | Claude Code event schemas, tool input parsers, handler types, stdout schemas |
 | `agent-hook-schemas/claude-hooks-integration` | `mergeClaudeHooksFiles`, `resolveMatchingClaudeHandlers`, matcher/if helpers |
 | `agent-hook-schemas/codex` | Codex event schemas, strict wire-format stdout, `mergeCodexHooksFiles`, resolver |
+| `agent-hook-schemas/codex-tasks` | Codex task schemas, including the `update_plan` alias for task updates |
 | `agent-hook-schemas/gemini` | Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput` |
 | `agent-hook-schemas/gemini-hooks-integration` | `mergeGeminiHooksFiles`, `resolveMatchingGeminiHandlers`, timeout helpers |
 | `agent-hook-schemas/cursor` | Cursor agent hooks stdin schemas (camelCase events), `ParseCursorHookInput` |
