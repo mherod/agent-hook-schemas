@@ -35,7 +35,23 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 ### Key patterns
 
 - **`.loose()` for forward compatibility**: Input schemas use `.loose()` so unknown fields from future platform versions pass through without breaking parsing. This is intentional — do not replace with `.strict()`.
+- **Forward-compatible enums in input paths** (Issue #3): Enum fields in hook stdin use `.or(z.string())` to accept known values + unknown future values. Pattern:
+  ```ts
+  export const EnumNameSchema = z.enum(["value1", "value2"]);
+  export const EnumNameInputSchema = EnumNameSchema.or(z.string()); // Accept future values
+  // Use EnumNameInputSchema in hook input schemas, keep EnumNameSchema for outputs/settings
+  ```
+  This enables downstream consumers to accept future enum values without requiring package version bumps. See commit 514179c for full implementation examples in claude.ts and gemini.ts.
 - **Discriminated unions**: `HookEventInputSchema` discriminates on `hook_event_name`; `ReadToolResponseSchema` on `type`; `HookHandlerSchema` on handler `type`; `TaskToolInputSchema` on `tool_name`.
+- **Fallback catch-all schemas**: Unknown hook event types use fallback schemas with `.refine()` guard to ensure known event types still validate their specific schemas:
+  ```ts
+  const UnknownHookEventInputSchema = HookInputBaseSchema.extend({
+    hook_event_name: z.string().refine(
+      (name) => !HookEventNameSchema.safeParse(name).success,
+      { message: "Use specific event schema for known event names" },
+    ),
+  }).loose();
+  ```
 - **Per-platform Parse functions**: Each platform exports a top-level `Parse*HookInput()` that returns `z.SafeParseReturnType` — one-call parsing of unknown stdin JSON.
 - **All fields optional on input base schemas**: `HookInputBaseSchema` and `CodexHookInputBaseSchema` have all fields optional for resilient parsing of partial payloads.
 
