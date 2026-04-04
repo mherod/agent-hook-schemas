@@ -2,33 +2,79 @@
 import { describe, expect, test } from "bun:test";
 import {
   CodexTaskToolInputSchema,
-  ParseCodexTaskUpdateToolInput,
+  ParseUpdatePlanArguments,
+  ParseUpdatePlanFunctionCall,
+  ParseUpdatePlanFunctionCallOutput,
   ParseUpdatePlanToolInput,
+  UpdatePlanArgumentsSchema,
+  UpdatePlanFunctionCallSchema,
+  UpdatePlanFunctionCallOutputSchema,
+  UpdatePlanStepSchema,
 } from "./codex-tasks.ts";
 
 describe("codex-tasks", () => {
-  test("accepts update_plan as a task update alias", () => {
+  test("validates the captured update_plan argument payload", () => {
     const payload = {
-      tool_name: "update_plan",
-      tool_input: {
-        taskId: "task-001",
-        status: "in_progress",
-        subject: "Refine hook schemas",
-      },
+      explanation: "Creating the required five-task plan before analysis work, per the report-issue skill.",
+      plan: [
+        { step: "Analyze raw input", status: "in_progress" },
+        { step: "Research technical context", status: "pending" },
+        { step: "Investigate codebase", status: "pending" },
+        { step: "Draft issue title and body", status: "pending" },
+        { step: "Create GitHub issue", status: "pending" },
+      ],
     };
 
+    expect(UpdatePlanArgumentsSchema.safeParse(payload).success).toBe(true);
     expect(CodexTaskToolInputSchema.safeParse(payload).success).toBe(true);
+    expect(ParseUpdatePlanToolInput(payload).success).toBe(true);
+  });
+
+  test("validates the captured update_plan function-call envelope", () => {
+    const payload = {
+      type: "function_call",
+      name: "update_plan",
+      arguments: JSON.stringify({
+        plan: [{ step: "Stage current changes", status: "in_progress" }],
+      }),
+      call_id: "call_123",
+    };
+
+    expect(UpdatePlanFunctionCallSchema.safeParse(payload).success).toBe(true);
+    expect(ParseUpdatePlanFunctionCall(payload).success).toBe(true);
+  });
+
+  test("validates the captured update_plan function-call output", () => {
+    const payload = {
+      type: "function_call_output",
+      call_id: "call_123",
+      output: "Plan updated",
+    };
+
+    expect(UpdatePlanFunctionCallOutputSchema.safeParse(payload).success).toBe(true);
+    expect(ParseUpdatePlanFunctionCallOutput(payload).success).toBe(true);
+  });
+
+  test("parses update_plan arguments from captured JSON text", () => {
+    const result = ParseUpdatePlanArguments(
+      JSON.stringify({
+        explanation: "Fell back to a local reproducible issue.",
+        plan: [{ step: "Commit current changes", status: "completed" }],
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.plan[0]?.status).toBe("completed");
+    }
+  });
+
+  test("rejects plan steps with unknown status", () => {
     expect(
-      ParseCodexTaskUpdateToolInput({
-        taskId: "task-001",
-        status: "in_progress",
+      UpdatePlanStepSchema.safeParse({
+        step: "Inspect",
+        status: "blocked",
       }).success,
-    ).toBe(true);
-    expect(
-      ParseUpdatePlanToolInput({
-        taskId: "task-001",
-        status: "in_progress",
-      }).success,
-    ).toBe(true);
+    ).toBe(false);
   });
 });

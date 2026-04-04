@@ -1,140 +1,159 @@
 import { z } from "zod";
-import {
-  TaskCreateToolInputSchema as ClaudeTaskCreateToolInputSchema,
-  TaskCreateToolResponseSchema as ClaudeTaskCreateToolResponseSchema,
-  TaskGetToolInputSchema as ClaudeTaskGetToolInputSchema,
-  TaskGetToolResponseSchema as ClaudeTaskGetToolResponseSchema,
-  TaskListItemSchema as ClaudeTaskListItemSchema,
-  TaskListToolInputSchema as ClaudeTaskListToolInputSchema,
-  TaskListToolResponseSchema as ClaudeTaskListToolResponseSchema,
-  TaskOutputToolInputSchema as ClaudeTaskOutputToolInputSchema,
-  TaskStatusSchema as ClaudeTaskStatusSchema,
-  TaskStatusWithDeletedSchema as ClaudeTaskStatusWithDeletedSchema,
-  TaskStopToolInputSchema as ClaudeTaskStopToolInputSchema,
-  TaskUpdateToolInputSchema as ClaudeTaskUpdateToolInputSchema,
-  TaskUpdateToolResponseErrorSchema as ClaudeTaskUpdateToolResponseErrorSchema,
-  TaskUpdateToolResponseSchema as ClaudeTaskUpdateToolResponseSchema,
-  TaskUpdateToolResponseSuccessSchema as ClaudeTaskUpdateToolResponseSuccessSchema,
-} from "./claude-tasks.ts";
 
 // ---------------------------------------------------------------------------
-// Codex task schemas
+// Codex update_plan schema
 // ---------------------------------------------------------------------------
 
 /**
- * Codex task schemas are structurally identical to Claude task schemas.
- *
- * Codex hook payloads use `update_plan` as a compatibility alias for the
- * update-shaped task tool, so the discriminated union accepts both names.
+ * Captured `update_plan` payloads use a small, explicit plan state machine.
+ * We keep the step object loose so raw captures can retain any future fields
+ * without breaking parsing, while still validating the known core contract.
  */
-
-export const CodexTaskStatusSchema = ClaudeTaskStatusSchema;
-export type CodexTaskStatus = z.infer<typeof CodexTaskStatusSchema>;
-
-export const CodexTaskStatusWithDeletedSchema = ClaudeTaskStatusWithDeletedSchema;
-export type CodexTaskStatusWithDeleted = z.infer<
-  typeof CodexTaskStatusWithDeletedSchema
->;
-
-export const CodexTaskCreateToolInputSchema = ClaudeTaskCreateToolInputSchema;
-export type CodexTaskCreateToolInput = z.infer<
-  typeof CodexTaskCreateToolInputSchema
->;
-
-export const CodexTaskCreateToolResponseSchema = ClaudeTaskCreateToolResponseSchema;
-export type CodexTaskCreateToolResponse = z.infer<
-  typeof CodexTaskCreateToolResponseSchema
->;
-
-export const CodexTaskUpdateToolInputSchema = ClaudeTaskUpdateToolInputSchema;
-export type CodexTaskUpdateToolInput = z.infer<
-  typeof CodexTaskUpdateToolInputSchema
->;
-
-export const CodexTaskUpdateToolResponseSuccessSchema =
-  ClaudeTaskUpdateToolResponseSuccessSchema;
-export type CodexTaskUpdateToolResponseSuccess = z.infer<
-  typeof CodexTaskUpdateToolResponseSuccessSchema
->;
-
-export const CodexTaskUpdateToolResponseErrorSchema =
-  ClaudeTaskUpdateToolResponseErrorSchema;
-export type CodexTaskUpdateToolResponseError = z.infer<
-  typeof CodexTaskUpdateToolResponseErrorSchema
->;
-
-export const CodexTaskUpdateToolResponseSchema = ClaudeTaskUpdateToolResponseSchema;
-export type CodexTaskUpdateToolResponse = z.infer<
-  typeof CodexTaskUpdateToolResponseSchema
->;
-
-export const CodexTaskListToolInputSchema = ClaudeTaskListToolInputSchema;
-export type CodexTaskListToolInput = z.infer<typeof CodexTaskListToolInputSchema>;
-
-export const CodexTaskListItemSchema = ClaudeTaskListItemSchema;
-export type CodexTaskListItem = z.infer<typeof CodexTaskListItemSchema>;
-
-export const CodexTaskListToolResponseSchema = ClaudeTaskListToolResponseSchema;
-export type CodexTaskListToolResponse = z.infer<
-  typeof CodexTaskListToolResponseSchema
->;
-
-export const CodexTaskGetToolInputSchema = ClaudeTaskGetToolInputSchema;
-export type CodexTaskGetToolInput = z.infer<typeof CodexTaskGetToolInputSchema>;
-
-export const CodexTaskGetToolResponseSchema = ClaudeTaskGetToolResponseSchema;
-export type CodexTaskGetToolResponse = z.infer<
-  typeof CodexTaskGetToolResponseSchema
->;
-
-export const CodexTaskOutputToolInputSchema = ClaudeTaskOutputToolInputSchema;
-export type CodexTaskOutputToolInput = z.infer<
-  typeof CodexTaskOutputToolInputSchema
->;
-
-export const CodexTaskStopToolInputSchema = ClaudeTaskStopToolInputSchema;
-export type CodexTaskStopToolInput = z.infer<typeof CodexTaskStopToolInputSchema>;
-
-/**
- * Codex aliases `update_plan` to the same payload shape as `TaskUpdate`.
- * Keep the canonical `TaskUpdate` name in the union for compatibility.
- */
-export const CodexUpdatePlanToolInputSchema = CodexTaskUpdateToolInputSchema;
-export type CodexUpdatePlanToolInput = z.infer<
-  typeof CodexUpdatePlanToolInputSchema
->;
-
-export const CodexTaskToolInputSchema = z.discriminatedUnion("tool_name", [
-  z.object({ tool_name: z.literal("TaskCreate"), tool_input: CodexTaskCreateToolInputSchema }),
-  z.object({ tool_name: z.literal("TaskUpdate"), tool_input: CodexTaskUpdateToolInputSchema }),
-  z.object({ tool_name: z.literal("update_plan"), tool_input: CodexUpdatePlanToolInputSchema }),
-  z.object({ tool_name: z.literal("TaskList"), tool_input: CodexTaskListToolInputSchema }),
-  z.object({ tool_name: z.literal("TaskGet"), tool_input: CodexTaskGetToolInputSchema }),
-  z.object({ tool_name: z.literal("TaskOutput"), tool_input: CodexTaskOutputToolInputSchema }),
-  z.object({ tool_name: z.literal("TaskStop"), tool_input: CodexTaskStopToolInputSchema }),
+export const UpdatePlanStepStatusSchema = z.enum([
+  "pending",
+  "in_progress",
+  "completed",
 ]);
+export type UpdatePlanStepStatus = z.infer<typeof UpdatePlanStepStatusSchema>;
+
+export const UpdatePlanStepSchema = z
+  .object({
+    step: z.string(),
+    status: UpdatePlanStepStatusSchema,
+  })
+  .loose();
+export type UpdatePlanStep = z.infer<typeof UpdatePlanStepSchema>;
+
+/**
+ * Raw arguments passed to Codex `update_plan`.
+ *
+ * Captured payloads show:
+ * - `explanation` is optional
+ * - `plan` is an ordered array of step records
+ * - each step has `step` and `status`
+ */
+export const UpdatePlanArgumentsSchema = z
+  .object({
+    explanation: z.string().optional(),
+    plan: z.array(UpdatePlanStepSchema).nonempty(),
+  })
+  .loose();
+export type UpdatePlanArguments = z.infer<typeof UpdatePlanArgumentsSchema>;
+
+/**
+ * Raw function-call envelope captured in archived sessions before the
+ * arguments string is parsed.
+ */
+export const UpdatePlanFunctionCallSchema = z
+  .object({
+    type: z.literal("function_call"),
+    name: z.literal("update_plan"),
+    arguments: z.string(),
+    call_id: z.string(),
+  })
+  .loose();
+export type UpdatePlanFunctionCall = z.infer<typeof UpdatePlanFunctionCallSchema>;
+
+/**
+ * Raw function-call output captured in archived sessions after `update_plan`
+ * completes. The captured payload is a plain completion string.
+ */
+export const UpdatePlanFunctionCallOutputSchema = z
+  .object({
+    type: z.literal("function_call_output"),
+    call_id: z.string(),
+    output: z.string(),
+  })
+  .loose();
+export type UpdatePlanFunctionCallOutput = z.infer<
+  typeof UpdatePlanFunctionCallOutputSchema
+>;
+
+/**
+ * Backwards-compatible alias for the captured `update_plan` argument payload.
+ * The previous Codex task schema name is kept so existing imports continue to
+ * compile, but the contract now reflects the real tool payload.
+ */
+export const CodexTaskToolInputSchema = UpdatePlanArgumentsSchema;
 export type CodexTaskToolInput = z.infer<typeof CodexTaskToolInputSchema>;
 
-export function ParseCodexTaskCreateToolInput(toolInput: unknown) {
-  return CodexTaskCreateToolInputSchema.safeParse(toolInput);
-}
+export const CodexUpdatePlanToolInputSchema = UpdatePlanArgumentsSchema;
+export type CodexUpdatePlanToolInput = z.infer<typeof CodexUpdatePlanToolInputSchema>;
 
-export function ParseCodexTaskUpdateToolInput(toolInput: unknown) {
-  return CodexTaskUpdateToolInputSchema.safeParse(toolInput);
-}
+export const CodexUpdatePlanFunctionCallSchema = UpdatePlanFunctionCallSchema;
+export type CodexUpdatePlanFunctionCall = z.infer<
+  typeof CodexUpdatePlanFunctionCallSchema
+>;
 
+export const CodexUpdatePlanFunctionCallOutputSchema =
+  UpdatePlanFunctionCallOutputSchema;
+export type CodexUpdatePlanFunctionCallOutput = z.infer<
+  typeof CodexUpdatePlanFunctionCallOutputSchema
+>;
+
+/** Parse raw `update_plan` arguments that have already been JSON-decoded. */
 export function ParseUpdatePlanToolInput(toolInput: unknown) {
-  return CodexUpdatePlanToolInputSchema.safeParse(toolInput);
+  return UpdatePlanArgumentsSchema.safeParse(toolInput);
 }
 
+/** Parse the outer `update_plan` function-call envelope captured in transcripts. */
+export function ParseUpdatePlanFunctionCall(functionCall: unknown) {
+  return UpdatePlanFunctionCallSchema.safeParse(functionCall);
+}
+
+/** Parse the outer `update_plan` function-call output captured in transcripts. */
+export function ParseUpdatePlanFunctionCallOutput(functionCallOutput: unknown) {
+  return UpdatePlanFunctionCallOutputSchema.safeParse(functionCallOutput);
+}
+
+/** Parse the JSON-string arguments field from a captured `update_plan` call. */
+export function ParseUpdatePlanArguments(argumentsText: string) {
+  try {
+    return UpdatePlanArgumentsSchema.safeParse(JSON.parse(argumentsText) as unknown);
+  } catch {
+    return UpdatePlanArgumentsSchema.safeParse(null);
+  }
+}
+
+/**
+ * Legacy helper retained for compatibility with the previous Codex task module
+ * name. This now parses the `update_plan` argument payload rather than Claude
+ * task-update tool input.
+ */
+export function ParseCodexTaskCreateToolInput(toolInput: unknown) {
+  return ParseUpdatePlanToolInput(toolInput);
+}
+
+/**
+ * Legacy helper retained for compatibility with the previous Codex task module
+ * name. This now parses the `update_plan` arguments payload.
+ */
+export function ParseCodexTaskUpdateToolInput(toolInput: unknown) {
+  return ParseUpdatePlanToolInput(toolInput);
+}
+
+/**
+ * Legacy helper retained for compatibility with the previous Codex task module
+ * name. This now parses the outer `update_plan` function-call output.
+ */
 export function ParseCodexTaskUpdateToolResponse(toolResponse: unknown) {
-  return CodexTaskUpdateToolResponseSchema.safeParse(toolResponse);
+  return ParseUpdatePlanFunctionCallOutput(toolResponse);
 }
 
+/**
+ * Legacy helper retained for compatibility with the previous Codex task module
+ * name. `update_plan` has no list/get response, so this simply reuses the
+ * argument parser.
+ */
 export function ParseCodexTaskListToolResponse(toolResponse: unknown) {
-  return CodexTaskListToolResponseSchema.safeParse(toolResponse);
+  return ParseUpdatePlanToolInput(toolResponse);
 }
 
+/**
+ * Legacy helper retained for compatibility with the previous Codex task module
+ * name. `update_plan` has no list/get response, so this simply reuses the
+ * argument parser.
+ */
 export function ParseCodexTaskGetToolResponse(toolResponse: unknown) {
-  return CodexTaskGetToolResponseSchema.safeParse(toolResponse);
+  return ParseUpdatePlanToolInput(toolResponse);
 }
