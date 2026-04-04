@@ -42,6 +42,10 @@
     "./gemini-hooks-integration": {
       "types": "./dist/gemini-hooks-integration.d.ts",
       "import": "./dist/gemini-hooks-integration.js"
+    },
+    "./claude-tasks": {
+      "types": "./dist/claude-tasks.d.ts",
+      "import": "./dist/claude-tasks.js"
     }
   },
   "files": [

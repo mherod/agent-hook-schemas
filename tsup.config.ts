@@ -5,6 +5,7 @@ export default defineConfig({
     "index.ts",
     "claude.ts",
     "claude-hooks-integration.ts",
+    "claude-tasks.ts",
     "codex.ts",
     "codex-hooks-integration.ts",
     "common.ts",
