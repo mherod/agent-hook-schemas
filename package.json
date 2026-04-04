@@ -1,6 +1,6 @@
 {
   "name": "agent-hook-schemas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Gemini CLI, Cursor).",
   "type": "module",
   "sideEffects": false,
