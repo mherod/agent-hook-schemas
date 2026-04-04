@@ -1,8 +1,45 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
----
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build & Test Commands
+
+```bash
+bun install                # install dependencies
+bun run build              # tsup → dist/ (ESM + .d.ts)
+bun test --concurrent      # run all tests (322+ tests across 7 files)
+bun test codex-tasks.test.ts index.test.ts codex-hooks-integration.test.ts  # run specific test files
+bun test --concurrent -t "pattern"  # run tests matching a name pattern
+```
+
+Always verify with `bun run build && bun test --concurrent` before committing schema changes.
+
+## Architecture
+
+This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across four platforms: **Claude Code**, **OpenAI Codex**, **Gemini CLI**, and **Cursor**.
+
+### Module layout (each is a separate subpath export via `package.json` `exports` + `tsup.config.ts` entry)
+
+- `claude.ts` — Claude Code event schemas (26 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
+- `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
+- `claude-tasks.ts` — Claude Code task management tool input/response schemas (TaskCreate, TaskUpdate, TaskGet, TaskList, TaskOutput, TaskStop)
+- `codex.ts` — Codex event schemas (5 events), strict wire-format stdout, `mergeCodexHooksFiles()`, resolver
+- `codex-tasks.ts` — Codex `update_plan` argument, function-call envelope, and output schemas
+- `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
+- `gemini.ts` — Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput()`
+- `gemini-hooks-integration.ts` — `mergeGeminiHooksFiles()`, `resolveMatchingGeminiHandlers()`
+- `cursor.ts` — Cursor agent hooks stdin schemas (camelCase events), `ParseCursorHookInput()`
+- `common.ts` — Shared shapes where Claude and Codex overlap (not re-exported from root barrel)
+- `index.ts` — Root barrel re-exporting all modules
+
+### Key patterns
+
+- **`.loose()` for forward compatibility**: Input schemas use `.loose()` so unknown fields from future platform versions pass through without breaking parsing. This is intentional — do not replace with `.strict()`.
+- **Discriminated unions**: `HookEventInputSchema` discriminates on `hook_event_name`; `ReadToolResponseSchema` on `type`; `HookHandlerSchema` on handler `type`; `TaskToolInputSchema` on `tool_name`.
+- **Per-platform Parse functions**: Each platform exports a top-level `Parse*HookInput()` that returns `z.SafeParseReturnType` — one-call parsing of unknown stdin JSON.
+- **All fields optional on input base schemas**: `HookInputBaseSchema` and `CodexHookInputBaseSchema` have all fields optional for resilient parsing of partial payloads.
+
+## Bun Runtime
 
 Default to using Bun instead of Node.js.
 
@@ -109,3 +146,11 @@ bun --hot ./index.ts
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
+
+## Codex Capture Schemas
+
+- When refining Codex hook schemas, treat archived transcript captures as the source of truth for payload shape.
+- For `update_plan`, model the decoded arguments, the outer `function_call` envelope, and the `function_call_output` record separately.
+- Keep `update_plan` step statuses limited to `pending`, `in_progress`, and `completed` unless new captured payloads prove otherwise.
+- Preserve compatibility aliases only when they forward to the captured Codex shapes; do not keep Claude-era task contracts once the real payload is known.
+- Verify Codex schema changes with `bun test codex-tasks.test.ts index.test.ts codex-hooks-integration.test.ts` and `bun run build`.

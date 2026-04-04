@@ -174,11 +174,125 @@ const codexResult = CodexHooksFileSchema.safeParse(hooksJson);
 
 | | Claude Code | Codex | Gemini CLI | Cursor |
 |---|---|---|---|---|
-| **Events** | 26 events | 5 events | 10 events | 9 events |
-| **Stdin style** | Loose (extra keys allowed) | Strict | Strict | Loose |
-| **Handler types** | command, http, prompt, agent | command only | command only | N/A |
-| **Matcher** | Regex on subject | Regex on subject | Glob pattern | N/A |
-| **Config merge** | Yes | Yes | Yes | No |
+| **Events** | 26 events | 5 events | 11 events | 10 events |
+| **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`) |
+| **Handler types** | command, http, prompt, agent | command only | command only | N/A (stdin-only) |
+| **Matcher** | Regex on subject | Regex on subject | Regex (tool) / exact (lifecycle) | N/A |
+| **`if` guard** | `Tool(glob)` on tool input | `Bash(glob)` only | No | No |
+| **Config merge** | Yes (`disableAllHooks` resets) | Yes (concatenate) | Yes (concatenate) | No |
+| **Stdout strictness** | Loose | Strict (`.strict()`, defaults) | Loose | N/A |
+| **Permission modes** | 6 (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`) | 5 (no `auto`) | N/A | N/A |
+| **Settings schema** | Full (`ClaudeSettingsSchema`) | Hooks only (`CodexHooksFileSchema`) | Minimal (`GeminiSettingsSchema`) | N/A |
+| **Permission rules** | `allow`/`deny` arrays with `Tool(glob)` syntax | No | No | No |
+| **Default timeout** | 600s | 600s (`timeout` or `timeoutSec`) | 60,000ms | N/A |
+
+### Event Name Comparison
+
+Events across platforms that serve equivalent purposes but use different names or casing:
+
+| Concept | Claude Code | Codex | Gemini CLI | Cursor |
+|---|---|---|---|---|
+| **Session start** | `SessionStart` | `SessionStart` | `SessionStart` | `sessionStart` |
+| **Session end** | `SessionEnd` | — | `SessionEnd` | `sessionEnd` |
+| **User prompt** | `UserPromptSubmit` | `UserPromptSubmit` | — | `beforeSubmitPrompt` |
+| **Before tool** | `PreToolUse` | `PreToolUse` | `BeforeTool` | `preToolUse` |
+| **After tool** | `PostToolUse` | `PostToolUse` | `AfterTool` | `postToolUse` |
+| **Tool failure** | `PostToolUseFailure` | — | — | — |
+| **Permission request** | `PermissionRequest` | — | — | — |
+| **Permission denied** | `PermissionDenied` | — | — | — |
+| **Stop / end of turn** | `Stop` | `Stop` | — | `stop` |
+| **Stop failure** | `StopFailure` | — | — | — |
+| **Before agent** | `SubagentStart` | — | `BeforeAgent` | — |
+| **After agent** | `SubagentStop` | — | `AfterAgent` | `afterAgentResponse` |
+| **Before shell** | — | — | — | `beforeShellExecution` |
+| **After shell** | — | — | — | `afterShellExecution` |
+| **Before model** | — | — | `BeforeModel` | — |
+| **After model** | — | — | `AfterModel` | — |
+| **Tool selection** | — | — | `BeforeToolSelection` | — |
+| **Notification** | `Notification` | — | `Notification` | — |
+| **Compaction** | `PreCompact` / `PostCompact` | — | `PreCompress` | `preCompact` |
+| **Config change** | `ConfigChange` | — | — | — |
+| **File change** | `FileChanged` | — | — | — |
+| **Worktree** | `WorktreeCreate` / `WorktreeRemove` | — | — | — |
+| **Task lifecycle** | `TaskCreated` / `TaskCompleted` | — | — | — |
+| **Elicitation** | `Elicitation` / `ElicitationResult` | — | — | — |
+| **Instructions** | `InstructionsLoaded` | — | — | — |
+| **Teammate** | `TeammateIdle` | — | — | — |
+| **CWD change** | `CwdChanged` | — | — | — |
+
+### Integration Module Comparison
+
+Each platform with config merge support has a parallel integration module with equivalent functions:
+
+| Function | Claude | Codex | Gemini |
+|---|---|---|---|
+| **Merge config layers** | `mergeClaudeHooksFiles()` | `mergeCodexHooksFiles()` | `mergeGeminiHooksFiles()` |
+| **Merge full settings** | `mergeClaudeSettings()` | — | — |
+| **Matcher matching** | `claudeMatcherMatches()` | `codexMatcherMatches()` | `geminiMatcherMatches()` |
+| **`if` guard eval** | `claudeToolIfMatches()` | `codexToolIfMatches()` | — |
+| **Resolve handlers** | `resolveMatchingClaudeHandlers()` | `resolveMatchingCodexHandlers()` | `resolveMatchingGeminiHandlers()` |
+| **Resolve from stdin** | `resolveMatchingClaudeHandlersFromInput()` | `resolveMatchingCodexHandlersFromInput()` | `resolveMatchingGeminiHandlersFromInput()` |
+| **Effective timeout** | `effectiveClaudeHandlerTimeoutSec()` → seconds | `effectiveCodexHandlerTimeoutSec()` → seconds | `effectiveGeminiHandlerTimeoutMs()` → milliseconds |
+| **Sequential groups** | — | — | `resolveMatchingGeminiHandlerGroups()` |
+| **Permission rules** | `evaluateSettingsPermissions()` | — | — |
+| **Validate settings** | `parseClaudeSettings()` | `parseCodexHooksFile()` | `parseGeminiSettings()` |
+
+### Hook Stdin Base Fields
+
+Fields available on hook stdin payloads across platforms:
+
+| Field | Claude | Codex | Gemini | Cursor |
+|---|---|---|---|---|
+| `session_id` | Yes | Yes | Yes | Yes |
+| `transcript_path` | `string` | `string \| null` | `string` | `string \| null` |
+| `cwd` | Yes | Yes | Yes | Yes (some events) |
+| `model` | Yes (SessionStart) | Yes | — | Yes |
+| `permission_mode` | Yes | Yes | — | — |
+| `hook_event_name` | PascalCase | PascalCase | PascalCase | camelCase |
+| `tool_name` | Yes (tool events) | Yes (tool events) | Yes (`BeforeTool`/`AfterTool`) | Yes (tool events) |
+| `tool_input` | `Record<string, unknown>` | Typed per tool | `Record<string, unknown>` | `Record<string, unknown>` |
+| `tool_response` | Yes (PostToolUse) | Yes (PostToolUse) | Yes (`AfterTool`) | `string \| object` (postToolUse) |
+| `stop_hook_active` | Yes (Stop) | Yes (Stop) | Yes (`AfterAgent`) | — |
+| `timestamp` | — | — | Yes | — |
+| `turn_id` | — | Yes | — | — |
+| `agent_id`/`agent_type` | Yes | — | — | — |
+| `conversation_id` | — | — | — | Yes |
+| `generation_id` | — | — | — | Yes |
+| `cursor_version` | — | — | — | Yes |
+| `workspace_roots` | — | — | — | Yes |
+
+### Hook Stdout Comparison
+
+How hook scripts communicate results back to the platform:
+
+| Field | Claude | Codex | Gemini | Cursor |
+|---|---|---|---|---|
+| `continue` | Optional | Default `true` | Optional | — |
+| `decision` | `"block"` | `"approve" \| "block"` (PreToolUse), `"block"` (others) | `"allow" \| "deny" \| "block"` | — |
+| `reason` | Optional string | `string \| null` | Optional string | — |
+| `hookSpecificOutput` | Discriminated on `hookEventName` | Strict wire schemas per event | Shared + Gemini extension | — |
+| `systemMessage` | Optional | `string \| null` | Optional | — |
+| `suppressOutput` | Optional | Default `false` | Optional | — |
+| `stopReason` | Optional | `string \| null` | Optional | — |
+| `hookSpecificOutput.permissionDecision` | `allow \| deny \| ask \| defer` | `allow \| deny \| ask` (no `defer`) | — | — |
+| `hookSpecificOutput.updatedInput` | Optional | `object \| null` | — | — |
+| `hookSpecificOutput.updatedMCPToolOutput` | Optional (PostToolUse) | `object \| null` (PostToolUse) | — | — |
+| `hookSpecificOutput.tool_input` | — | — | Optional (Gemini-only) | — |
+| `hookSpecificOutput.llm_request` | — | — | Optional (Gemini-only) | — |
+| `hookSpecificOutput.toolConfig` | — | — | Optional (Gemini-only) | — |
+| `hookSpecificOutput.tailToolCallRequest` | — | — | Optional (Gemini-only) | — |
+| `watchPaths` | Yes (Claude-only) | — | — | — |
+
+### Task Schema Comparison
+
+| | Claude Code (`claude-tasks.ts`) | Codex (`codex-tasks.ts`) |
+|---|---|---|
+| **Mechanism** | Built-in tools (`TaskCreate`, `TaskUpdate`, etc.) | `update_plan` function call |
+| **Status values** | `pending`, `in_progress`, `completed`, `deleted` | `pending`, `in_progress`, `completed` |
+| **Schema style** | Loose (`.loose()`) | Loose (`.loose()`) |
+| **Tool count** | 6 tools (Create, Update, Get, List, Output, Stop) | 1 function (`update_plan`) |
+| **Plan structure** | Individual tasks with subject/description | Ordered step array with explanation |
+| **Wire format** | Tool input/response JSON | Function call envelope + decoded arguments |
 
 ## Development
 
