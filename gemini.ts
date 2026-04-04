@@ -18,6 +18,12 @@ export const GeminiHookEventNameSchema = z.enum([
   "PreCompress",
   "Notification",
 ]);
+
+/**
+ * Forward-compatible version of GeminiHookEventNameSchema for hook input parsing.
+ * Accepts known event names + any unknown string for future event types.
+ */
+export const GeminiHookEventNameInputSchema = GeminiHookEventNameSchema.or(z.string());
 export type GeminiHookEventName = z.infer<typeof GeminiHookEventNameSchema>;
 
 /** Hook handler in `settings.json`; `timeout` is milliseconds (default runtime: 60000). */
@@ -199,6 +205,18 @@ export const GeminiNotificationInputSchema = GeminiHookInputBaseSchema.extend({
 }).loose();
 export type GeminiNotificationInput = z.infer<typeof GeminiNotificationInputSchema>;
 
+/**
+ * Fallback catch-all schema for unknown Gemini hook events (forward compatibility).
+ * Accepts only hook_event_name values that aren't in the known GeminiHookEventNameSchema enum.
+ * This prevents known events with validation failures from being accepted via fallback.
+ */
+const GeminiUnknownHookEventInputSchema = GeminiHookInputBaseSchema.extend({
+  hook_event_name: z.string().refine(
+    (name) => !GeminiHookEventNameSchema.safeParse(name).success,
+    { message: "Use specific event schema for known event names" },
+  ),
+}).loose();
+
 /** Discriminated union for Gemini hook stdin JSON. */
 export const GeminiHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   GeminiSessionStartInputSchema,
@@ -212,7 +230,7 @@ export const GeminiHookEventInputSchema = z.discriminatedUnion("hook_event_name"
   GeminiAfterToolInputSchema,
   GeminiPreCompressInputSchema,
   GeminiNotificationInputSchema,
-]);
+]).or(GeminiUnknownHookEventInputSchema);
 export type GeminiHookEventInput = z.infer<typeof GeminiHookEventInputSchema>;
 
 // --- stdout (common + hookSpecificOutput bag) --------------------------------

@@ -47,6 +47,12 @@ export const PermissionModeSchema = z.enum([
   "dontAsk",
   "bypassPermissions",
 ]);
+
+/**
+ * Forward-compatible version of PermissionModeSchema for hook input parsing.
+ * Accepts known values + any unknown string for future compatibility.
+ */
+export const PermissionModeInputSchema = PermissionModeSchema.or(z.string());
 export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
 export const HookEventNameSchema = z.enum([
@@ -77,10 +83,22 @@ export const HookEventNameSchema = z.enum([
   "Elicitation",
   "ElicitationResult",
 ]);
+
+/**
+ * Forward-compatible version of HookEventNameSchema for hook input parsing.
+ * Accepts known event names + any unknown string for future event types.
+ */
+export const HookEventNameInputSchema = HookEventNameSchema.or(z.string());
 export type HookEventName = z.infer<typeof HookEventNameSchema>;
 
 export const SessionStartSourceSchema = z.enum(["startup", "resume", "clear", "compact"]);
 export type SessionStartSource = z.infer<typeof SessionStartSourceSchema>;
+
+/**
+ * Forward-compatible version of SessionStartSourceSchema for hook input parsing.
+ * Accepts known sources + any unknown string for future source types.
+ */
+export const SessionStartSourceInputSchema = SessionStartSourceSchema.or(z.string());
 
 export const MemoryTypeSchema = z.enum(["User", "Project", "Local", "Managed"]);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
@@ -101,6 +119,12 @@ export const ConfigChangeSourceSchema = z.enum([
   "policy_settings",
   "skills",
 ]);
+
+/**
+ * Forward-compatible version of ConfigChangeSourceSchema for hook input parsing.
+ * Accepts known sources + any unknown string for future source types.
+ */
+export const ConfigChangeSourceInputSchema = ConfigChangeSourceSchema.or(z.string());
 export type ConfigChangeSource = z.infer<typeof ConfigChangeSourceSchema>;
 
 export const NotificationTypeSchema = z.enum([
@@ -109,6 +133,12 @@ export const NotificationTypeSchema = z.enum([
   "auth_success",
   "elicitation_dialog",
 ]);
+
+/**
+ * Forward-compatible version of NotificationTypeSchema for hook input parsing.
+ * Accepts known types + any unknown string for future notification types.
+ */
+export const NotificationTypeInputSchema = NotificationTypeSchema.or(z.string());
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
 
 export const CompactTriggerSchema = z.enum(["manual", "auto"]);
@@ -505,7 +535,7 @@ export const HookInputBaseSchema = z
     session_id: z.string().optional(),
     transcript_path: z.string().optional(),
     cwd: z.string().optional(),
-    permission_mode: PermissionModeSchema.optional(),
+    permission_mode: PermissionModeInputSchema.optional(),
   })
   .extend(AgentHookContextSchema.partial().shape);
 export type HookInputBase = z.infer<typeof HookInputBaseSchema>;
@@ -536,7 +566,7 @@ const TaskTimelinePayloadSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const SessionStartInputSchema = hookStdinLoose("SessionStart", {
-  source: SessionStartSourceSchema.optional(),
+  source: SessionStartSourceInputSchema.optional(),
   model: z.string().optional(),
 });
 export type SessionStartInput = z.infer<typeof SessionStartInputSchema>;
@@ -611,7 +641,7 @@ export type PermissionDeniedInput = z.infer<typeof PermissionDeniedInputSchema>;
 export const NotificationInputSchema = hookStdinLoose("Notification", {
   message: z.string().optional(),
   title: z.string().optional(),
-  notification_type: NotificationTypeSchema.optional(),
+  notification_type: NotificationTypeInputSchema.optional(),
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
 
@@ -664,7 +694,7 @@ export const TeammateIdleInputSchema = hookStdinLoose("TeammateIdle", {
 export type TeammateIdleInput = z.infer<typeof TeammateIdleInputSchema>;
 
 export const ConfigChangeInputSchema = hookStdinLoose("ConfigChange", {
-  source: ConfigChangeSourceSchema.optional(),
+  source: ConfigChangeSourceInputSchema.optional(),
   file_path: z.string().optional(),
 });
 export type ConfigChangeInput = z.infer<typeof ConfigChangeInputSchema>;
@@ -733,6 +763,18 @@ export const ElicitationResultInputSchema = HookInputBaseSchema.extend({
   .loose();
 export type ElicitationResultInput = z.infer<typeof ElicitationResultInputSchema>;
 
+/**
+ * Fallback catch-all schema for unknown Claude hook events (forward compatibility).
+ * Accepts only hook_event_name values that aren't in the known HookEventNameSchema enum.
+ * This prevents known events with validation failures from being accepted via fallback.
+ */
+const UnknownHookEventInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.string().refine(
+    (name) => !HookEventNameSchema.safeParse(name).success,
+    { message: "Use specific event schema for known event names" },
+  ),
+}).loose();
+
 /** Discriminated union: parse unknown hook stdin in one step. */
 export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   SessionStartInputSchema,
@@ -761,7 +803,7 @@ export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   SessionEndInputSchema,
   ElicitationInputSchema,
   ElicitationResultInputSchema,
-]);
+]).or(UnknownHookEventInputSchema);
 export type HookEventInput = z.infer<typeof HookEventInputSchema>;
 
 // ---------------------------------------------------------------------------

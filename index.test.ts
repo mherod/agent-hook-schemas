@@ -74,14 +74,18 @@ describe("ParseHookInput", () => {
     expect(r.success).toBe(true);
   });
 
-  test("rejects SessionStart on invalid enum source", () => {
+  test("accepts SessionStart with unknown source value (forward-compatible)", () => {
     const r = ParseHookInput({
       ...claudeBase,
       hook_event_name: "SessionStart",
       source: "not-a-valid-source",
       model: "opus",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("SessionStart");
+      expect((r.data as Record<string, unknown>).source).toBe("not-a-valid-source");
+    }
   });
 
   test("accepts SessionStart and preserves extra keys (loose)", () => {
@@ -122,14 +126,17 @@ describe("ParseHookInput", () => {
     expect(r.success).toBe(false);
   });
 
-  test("rejects unknown hook_event_name string", () => {
+  test("accepts unknown hook_event_name string (forward-compatible)", () => {
     const r = ParseHookInput({
       ...claudeBase,
       hook_event_name: "UnknownEvent",
       source: "startup",
       model: "x",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("UnknownEvent");
+    }
   });
 });
 
