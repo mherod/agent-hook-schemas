@@ -43,6 +43,7 @@ import {
   StopHookGuardShouldSkip,
   ToolInputCommand,
   ToolInputFilePath,
+  ParseGeminiHookInput,
   WebFetchToolInputSchema,
   WebSearchToolInputSchema,
 } from "./index.ts";
@@ -64,13 +65,13 @@ describe("ParseHookInput", () => {
     expect(ParseHookInput({}).success).toBe(false);
   });
 
-  test("rejects SessionStart when required event fields missing", () => {
+  test("accepts SessionStart with partial fields (resilient parsing)", () => {
     const r = ParseHookInput({
       ...claudeBase,
       hook_event_name: "SessionStart",
       source: "startup",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
   test("rejects SessionStart on invalid enum source", () => {
@@ -143,12 +144,12 @@ describe("ParseCodexHookInput", () => {
     expect(ParseCodexHookInput(null).success).toBe(false);
   });
 
-  test("rejects SessionStart missing source", () => {
+  test("accepts Codex SessionStart with partial fields (resilient parsing)", () => {
     const r = ParseCodexHookInput({
       ...codexBase,
       hook_event_name: "SessionStart",
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
   test("accepts Codex SessionStart", () => {
@@ -162,7 +163,7 @@ describe("ParseCodexHookInput", () => {
     expect(r.success).toBe(true);
   });
 
-  test("rejects Codex SessionStart strict stdin extra top-level key", () => {
+  test("accepts Codex SessionStart extra top-level key (loose passthrough)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -172,7 +173,7 @@ describe("ParseCodexHookInput", () => {
         transcript_path: null,
         extra_field: true,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("rejects Codex SessionStart permission_mode auto", () => {
@@ -212,7 +213,7 @@ describe("ParseCodexHookInput", () => {
     expect(r.success).toBe(true);
   });
 
-  test("rejects Codex Stop with extra properties (strict stdin)", () => {
+  test("accepts Codex Stop with extra properties (loose passthrough)", () => {
     const r = ParseCodexHookInput({
       ...codexBase,
       hook_event_name: "Stop",
@@ -223,7 +224,7 @@ describe("ParseCodexHookInput", () => {
       permission_mode: "default",
       extra_field: true,
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 
   test("rejects Codex Stop permission_mode auto (not in stop.command.input schema)", () => {
@@ -239,7 +240,7 @@ describe("ParseCodexHookInput", () => {
     expect(r.success).toBe(false);
   });
 
-  test("rejects Codex PreToolUse non-Bash tool_name", () => {
+  test("accepts Codex PreToolUse non-Bash tool_name (forward-compatible)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -251,10 +252,10 @@ describe("ParseCodexHookInput", () => {
         tool_use_id: "u1",
         tool_input: { command: "ignored" },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  test("rejects Codex PreToolUse strict stdin extra top-level key", () => {
+  test("accepts Codex PreToolUse extra top-level key (loose passthrough)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -267,10 +268,10 @@ describe("ParseCodexHookInput", () => {
         tool_input: { command: "ls" },
         extra_field: true,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  test("rejects Codex PreToolUse tool_input extra properties", () => {
+  test("accepts Codex PreToolUse tool_input extra properties (resilient parsing)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -282,7 +283,7 @@ describe("ParseCodexHookInput", () => {
         tool_use_id: "u1",
         tool_input: { command: "ls", description: "run" },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("rejects Codex PreToolUse permission_mode auto", () => {
@@ -300,7 +301,7 @@ describe("ParseCodexHookInput", () => {
     ).toBe(false);
   });
 
-  test("rejects Codex PostToolUse non-Bash tool_name", () => {
+  test("accepts Codex PostToolUse non-Bash tool_name (forward-compatible)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -313,10 +314,10 @@ describe("ParseCodexHookInput", () => {
         tool_input: { command: "ignored" },
         tool_response: {},
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  test("rejects Codex PostToolUse strict stdin extra top-level key", () => {
+  test("accepts Codex PostToolUse extra top-level key (loose passthrough)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -330,10 +331,10 @@ describe("ParseCodexHookInput", () => {
         tool_response: "",
         extra_field: true,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  test("rejects Codex PostToolUse tool_input extra properties", () => {
+  test("accepts Codex PostToolUse tool_input extra properties (resilient parsing)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -346,7 +347,7 @@ describe("ParseCodexHookInput", () => {
         tool_input: { command: "ls", cwd: "/tmp" },
         tool_response: null,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("rejects Codex PostToolUse permission_mode auto", () => {
@@ -365,7 +366,7 @@ describe("ParseCodexHookInput", () => {
     ).toBe(false);
   });
 
-  test("rejects Codex UserPromptSubmit strict stdin extra top-level key", () => {
+  test("accepts Codex UserPromptSubmit extra top-level key (loose passthrough)", () => {
     expect(
       ParseCodexHookInput({
         ...codexBase,
@@ -376,7 +377,7 @@ describe("ParseCodexHookInput", () => {
         prompt: "hi",
         extra_field: true,
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   test("rejects Codex UserPromptSubmit permission_mode auto", () => {
@@ -813,20 +814,21 @@ describe("docs: settings.json hook configurations", () => {
 });
 
 describe("docs: hook stdin JSON (ParseHookInput)", () => {
-  test("PreToolUse Bash excerpt: docs omit tool_use_id; schema requires it", () => {
+  test("PreToolUse Bash excerpt: docs omit tool_use_id; resilient parsing accepts it", () => {
     const docTeaser = {
       ...claudeBase,
       hook_event_name: "PreToolUse" as const,
       tool_name: "Bash",
       tool_input: { command: "npm test" },
     };
-    expect(ParseHookInput(docTeaser).success).toBe(false);
+    // tool_use_id is now optional for resilient parsing — partial payloads accepted
+    expect(ParseHookInput(docTeaser).success).toBe(true);
 
     const runtimeShape = { ...docTeaser, tool_use_id: "tu-doc-1" };
     const r = ParseHookInput(runtimeShape);
     expect(r.success).toBe(true);
     if (r.success && r.data.hook_event_name === "PreToolUse") {
-      const bash = ParseBashToolInput(r.data.tool_input);
+      const bash = ParseBashToolInput(r.data.tool_input ?? {});
       expect(bash.success).toBe(true);
       if (bash.success) expect(bash.data.command).toBe("npm test");
     }
@@ -2170,7 +2172,7 @@ describe("codex docs: stdin (ParseCodexHookInput)", () => {
     });
     expect(r.success).toBe(true);
     if (r.success && r.data.hook_event_name === "PreToolUse") {
-      expect(r.data.tool_input.command).toBe("npm test");
+      expect(r.data.tool_input?.command).toBe("npm test");
     }
   });
 
@@ -2456,5 +2458,123 @@ describe("codex docs: stdout JSON schemas", () => {
     expect(r.data.decision).toBeNull();
     expect(r.data.reason).toBeNull();
     expect(r.data.suppressOutput).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #1: Resilient parsing — passthrough, optional fields, forward-compatible enums
+// ---------------------------------------------------------------------------
+
+describe("issue #1: loose input schemas allow unknown field passthrough", () => {
+  test("Claude: enriched payload with injected fields survives parse", () => {
+    const r = ParseHookInput({
+      hook_event_name: "Stop",
+      session_id: "s1",
+      cwd: "/tmp",
+      stop_hook_active: true,
+      last_assistant_message: "done",
+      _effectiveSettings: { theme: "dark" },
+      _terminal: { cols: 120 },
+      _envKeys: ["PATH", "HOME"],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      // Unknown fields preserved via .loose()
+      expect((r.data as Record<string, unknown>)._effectiveSettings).toEqual({ theme: "dark" });
+      expect((r.data as Record<string, unknown>)._envKeys).toEqual(["PATH", "HOME"]);
+    }
+  });
+
+  test("Codex: enriched payload with injected fields survives parse", () => {
+    const r = ParseCodexHookInput({
+      session_id: "s1",
+      cwd: "/tmp",
+      model: "gpt-4",
+      hook_event_name: "Stop",
+      stop_hook_active: false,
+      last_assistant_message: null,
+      transcript_path: null,
+      _customContext: { foo: "bar" },
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect((r.data as Record<string, unknown>)._customContext).toEqual({ foo: "bar" });
+    }
+  });
+
+  test("Gemini: enriched payload with injected fields survives parse", () => {
+    const r = ParseGeminiHookInput({
+      hook_event_name: "SessionStart",
+      session_id: "g1",
+      cwd: "/tmp",
+      timestamp: "2026-01-01T00:00:00Z",
+      source: "startup",
+      _injectedConfig: true,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect((r.data as Record<string, unknown>)._injectedConfig).toBe(true);
+    }
+  });
+});
+
+describe("issue #1: optional fields allow partial/best-effort payloads", () => {
+  test("Claude: minimal Stop payload (only hook_event_name)", () => {
+    const r = ParseHookInput({ hook_event_name: "Stop" });
+    expect(r.success).toBe(true);
+  });
+
+  test("Claude: minimal PreToolUse payload (no tool_use_id, no tool_input)", () => {
+    const r = ParseHookInput({ hook_event_name: "PreToolUse" });
+    expect(r.success).toBe(true);
+  });
+
+  test("Codex: minimal SessionStart payload (only hook_event_name + base)", () => {
+    const r = ParseCodexHookInput({
+      hook_event_name: "SessionStart",
+      session_id: "s1",
+      cwd: "/tmp",
+      model: "gpt-4",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("Gemini: minimal BeforeTool payload (no tool_name, no tool_input)", () => {
+    const r = ParseGeminiHookInput({ hook_event_name: "BeforeTool" });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe("issue #1: Gemini notification_type accepts arbitrary strings", () => {
+  test("ToolPermission (original enum value) still accepted", () => {
+    const r = ParseGeminiHookInput({
+      hook_event_name: "Notification",
+      session_id: "g1",
+      cwd: "/tmp",
+      timestamp: "2026-01-01T00:00:00Z",
+      notification_type: "ToolPermission",
+      message: "Allow?",
+      details: {},
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("info notification_type accepted (forward-compatible)", () => {
+    const r = ParseGeminiHookInput({
+      hook_event_name: "Notification",
+      notification_type: "info",
+      message: "FYI",
+      details: {},
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("warning notification_type accepted (forward-compatible)", () => {
+    const r = ParseGeminiHookInput({
+      hook_event_name: "Notification",
+      notification_type: "warning",
+      message: "Watch out",
+    });
+    expect(r.success).toBe(true);
   });
 });

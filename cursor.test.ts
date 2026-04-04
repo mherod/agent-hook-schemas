@@ -209,7 +209,7 @@ describe("Cursor hooks (stdin)", () => {
     });
     expect(r.success).toBe(true);
     if (r.success && r.data.hook_event_name === "beforeSubmitPrompt") {
-      expect(r.data.attachments[0]?.type).toBe("rule");
+      expect(r.data.attachments?.[0]?.type).toBe("rule");
     }
   });
 

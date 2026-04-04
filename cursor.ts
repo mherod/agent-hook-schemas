@@ -26,14 +26,14 @@ export type CursorHookEventName = z.infer<typeof CursorHookEventNameSchema>;
  * lifecycle). `generation_id` may be an empty string when not yet assigned.
  */
 export const CursorHookInputBaseSchema = z.object({
-  conversation_id: z.string(),
-  generation_id: z.string(),
-  model: z.string(),
-  session_id: z.string(),
-  cursor_version: z.string(),
-  workspace_roots: z.array(z.string()),
-  user_email: z.string(),
-  transcript_path: z.union([z.string(), z.null()]),
+  conversation_id: z.string().optional(),
+  generation_id: z.string().optional(),
+  model: z.string().optional(),
+  session_id: z.string().optional(),
+  cursor_version: z.string().optional(),
+  workspace_roots: z.array(z.string()).optional(),
+  user_email: z.string().optional(),
+  transcript_path: z.union([z.string(), z.null()]).optional(),
 });
 export type CursorHookInputBase = z.infer<typeof CursorHookInputBaseSchema>;
 
@@ -51,11 +51,11 @@ export type CursorBeforeSubmitPromptAttachment = z.infer<
 /** `hook_event_name: "afterAgentResponse"` — assistant message text + token usage for the turn. */
 export const CursorAfterAgentResponseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("afterAgentResponse"),
-  text: z.string(),
-  input_tokens: z.number(),
-  output_tokens: z.number(),
-  cache_read_tokens: z.number(),
-  cache_write_tokens: z.number(),
+  text: z.string().optional(),
+  input_tokens: z.number().optional(),
+  output_tokens: z.number().optional(),
+  cache_read_tokens: z.number().optional(),
+  cache_write_tokens: z.number().optional(),
 }).loose();
 export type CursorAfterAgentResponseHookInput = z.infer<
   typeof CursorAfterAgentResponseHookInputSchema
@@ -64,39 +64,39 @@ export type CursorAfterAgentResponseHookInput = z.infer<
 /** `hook_event_name: "stop"` — end of agent turn / usage summary. */
 export const CursorStopHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("stop"),
-  status: z.string(),
-  loop_count: z.number(),
-  input_tokens: z.number(),
-  output_tokens: z.number(),
-  cache_read_tokens: z.number(),
-  cache_write_tokens: z.number(),
+  status: z.string().optional(),
+  loop_count: z.number().optional(),
+  input_tokens: z.number().optional(),
+  output_tokens: z.number().optional(),
+  cache_read_tokens: z.number().optional(),
+  cache_write_tokens: z.number().optional(),
 }).loose();
 export type CursorStopHookInput = z.infer<typeof CursorStopHookInputSchema>;
 
 /** `hook_event_name: "sessionStart"` — new agent session. */
 export const CursorSessionStartHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("sessionStart"),
-  is_background_agent: z.boolean(),
-  composer_mode: z.string(),
+  is_background_agent: z.boolean().optional(),
+  composer_mode: z.string().optional(),
 }).loose();
 export type CursorSessionStartHookInput = z.infer<typeof CursorSessionStartHookInputSchema>;
 
 /** `hook_event_name: "sessionEnd"` — session closed. */
 export const CursorSessionEndHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("sessionEnd"),
-  reason: z.string(),
-  duration_ms: z.number(),
-  is_background_agent: z.boolean(),
-  final_status: z.string(),
+  reason: z.string().optional(),
+  duration_ms: z.number().optional(),
+  is_background_agent: z.boolean().optional(),
+  final_status: z.string().optional(),
 }).loose();
 export type CursorSessionEndHookInput = z.infer<typeof CursorSessionEndHookInputSchema>;
 
 /** `hook_event_name: "beforeSubmitPrompt"` — user prompt about to be sent. */
 export const CursorBeforeSubmitPromptHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("beforeSubmitPrompt"),
-  composer_mode: z.string(),
-  prompt: z.string(),
-  attachments: z.array(CursorBeforeSubmitPromptAttachmentSchema),
+  composer_mode: z.string().optional(),
+  prompt: z.string().optional(),
+  attachments: z.array(CursorBeforeSubmitPromptAttachmentSchema).optional(),
 }).loose();
 export type CursorBeforeSubmitPromptHookInput = z.infer<
   typeof CursorBeforeSubmitPromptHookInputSchema
@@ -105,9 +105,9 @@ export type CursorBeforeSubmitPromptHookInput = z.infer<
 /** `hook_event_name: "beforeShellExecution"` — shell command before run. */
 export const CursorBeforeShellExecutionHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("beforeShellExecution"),
-  command: z.string(),
-  cwd: z.string(),
-  sandbox: z.boolean(),
+  command: z.string().optional(),
+  cwd: z.string().optional(),
+  sandbox: z.boolean().optional(),
 }).loose();
 export type CursorBeforeShellExecutionHookInput = z.infer<
   typeof CursorBeforeShellExecutionHookInputSchema
@@ -116,10 +116,10 @@ export type CursorBeforeShellExecutionHookInput = z.infer<
 /** `hook_event_name: "afterShellExecution"` — shell command after run. */
 export const CursorAfterShellExecutionHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("afterShellExecution"),
-  command: z.string(),
-  output: z.string(),
-  duration: z.number(),
-  sandbox: z.boolean(),
+  command: z.string().optional(),
+  output: z.string().optional(),
+  duration: z.number().optional(),
+  sandbox: z.boolean().optional(),
 }).loose();
 export type CursorAfterShellExecutionHookInput = z.infer<
   typeof CursorAfterShellExecutionHookInputSchema
@@ -128,33 +128,33 @@ export type CursorAfterShellExecutionHookInput = z.infer<
 /** `hook_event_name: "preToolUse"` — before a tool runs. */
 export const CursorPreToolUseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("preToolUse"),
-  tool_name: z.string(),
-  tool_input: JsonObjectSchema,
-  tool_use_id: z.string(),
+  tool_name: z.string().optional(),
+  tool_input: JsonObjectSchema.optional(),
+  tool_use_id: z.string().optional(),
 }).loose();
 export type CursorPreToolUseHookInput = z.infer<typeof CursorPreToolUseHookInputSchema>;
 
 /** `hook_event_name: "postToolUse"` — after tool execution; `tool_output` is often a JSON string. */
 export const CursorPostToolUseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("postToolUse"),
-  tool_name: z.string(),
-  tool_input: JsonObjectSchema,
-  tool_output: z.union([z.string(), JsonObjectSchema]),
-  duration: z.number(),
-  tool_use_id: z.string(),
+  tool_name: z.string().optional(),
+  tool_input: JsonObjectSchema.optional(),
+  tool_output: z.union([z.string(), JsonObjectSchema]).optional(),
+  duration: z.number().optional(),
+  tool_use_id: z.string().optional(),
 }).loose();
 export type CursorPostToolUseHookInput = z.infer<typeof CursorPostToolUseHookInputSchema>;
 
 /** `hook_event_name: "preCompact"` — context compaction about to run. */
 export const CursorPreCompactHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("preCompact"),
-  trigger: z.string(),
-  context_usage_percent: z.number(),
-  context_tokens: z.number(),
-  context_window_size: z.number(),
-  message_count: z.number(),
-  messages_to_compact: z.number(),
-  is_first_compaction: z.boolean(),
+  trigger: z.string().optional(),
+  context_usage_percent: z.number().optional(),
+  context_tokens: z.number().optional(),
+  context_window_size: z.number().optional(),
+  message_count: z.number().optional(),
+  messages_to_compact: z.number().optional(),
+  is_first_compaction: z.boolean().optional(),
 }).loose();
 export type CursorPreCompactHookInput = z.infer<typeof CursorPreCompactHookInputSchema>;
 

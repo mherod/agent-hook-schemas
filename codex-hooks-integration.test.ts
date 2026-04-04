@@ -2,14 +2,16 @@
 import { describe, expect, test } from "bun:test";
 import {
   codexMatcherMatches,
+  codexToolIfMatches,
   effectiveCodexHandlerTimeoutSec,
   mergeCodexHooksFiles,
+  parseCodexHooksFile,
   resolveMatchingCodexHandlers,
   resolveMatchingCodexHandlersFromInput,
-} from "./codex.ts";
+} from "./codex-hooks-integration.ts";
 import { ParseCodexHookInput } from "./index.ts";
 
-const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number }>) =>
+const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number; if: string }>) =>
   ({
     type: "command" as const,
     command: c,
@@ -116,7 +118,11 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
         { matcher: "Bash", hooks: [cmd("policy-c.sh")] },
       ],
     };
-    const handlers = resolveMatchingCodexHandlers(config, "PreToolUse", "Bash");
+    const handlers = resolveMatchingCodexHandlers(config, "PreToolUse", {
+      subject: "Bash",
+      toolName: "Bash",
+      toolInput: { command: "ls" },
+    });
     expect(handlers.map((h) => h.command)).toEqual([
       "policy-a.sh",
       "policy-b.sh",
@@ -131,7 +137,11 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
         { matcher: "Bash", hooks: [cmd("dup.sh")] },
       ],
     };
-    const handlers = resolveMatchingCodexHandlers(config, "PreToolUse", "Bash");
+    const handlers = resolveMatchingCodexHandlers(config, "PreToolUse", {
+      subject: "Bash",
+      toolName: "Bash",
+      toolInput: { command: "ls" },
+    });
     expect(handlers).toHaveLength(2);
     expect(handlers[0]?.command).toBe("dup.sh");
     expect(handlers[1]?.command).toBe("dup.sh");
@@ -153,7 +163,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
     const handlers = resolveMatchingCodexHandlers(
       config,
       "UserPromptSubmit",
-      "unused",
+      { subject: "" },
     );
     expect(handlers.map((h) => h.command)).toEqual(["a.sh", "b.sh", "c.sh"]);
   });
@@ -166,7 +176,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       ],
     };
     expect(
-      resolveMatchingCodexHandlers(config, "Stop", "").map((h) => h.command),
+      resolveMatchingCodexHandlers(config, "Stop", { subject: "" }).map((h) => h.command),
     ).toEqual(["stop-a.sh", "stop-b.sh"]);
   });
 
@@ -178,12 +188,12 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       ],
     };
     expect(
-      resolveMatchingCodexHandlers(config, "SessionStart", "startup").map(
+      resolveMatchingCodexHandlers(config, "SessionStart", { subject: "startup" }).map(
         (h) => h.command,
       ),
     ).toEqual(["on-startup.sh"]);
     expect(
-      resolveMatchingCodexHandlers(config, "SessionStart", "resume").map(
+      resolveMatchingCodexHandlers(config, "SessionStart", { subject: "resume" }).map(
         (h) => h.command,
       ),
     ).toEqual(["on-resume.sh"]);
@@ -197,10 +207,39 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       ],
     };
     expect(
-      resolveMatchingCodexHandlers(config, "PostToolUse", "Bash").map(
-        (h) => h.command,
-      ),
+      resolveMatchingCodexHandlers(config, "PostToolUse", {
+        subject: "Bash",
+        toolName: "Bash",
+        toolInput: { command: "ls" },
+      }).map((h) => h.command),
     ).toEqual(["review.sh"]);
+  });
+
+  test("if guard filters handlers within matched groups", () => {
+    const config = {
+      PreToolUse: [
+        {
+          matcher: "Bash",
+          hooks: [
+            cmd("always.sh"),
+            cmd("git-only.sh", { if: "Bash(git *)" }),
+          ],
+        },
+      ],
+    };
+    const gitHandlers = resolveMatchingCodexHandlers(config, "PreToolUse", {
+      subject: "Bash",
+      toolName: "Bash",
+      toolInput: { command: "git status" },
+    });
+    expect(gitHandlers.map((h) => h.command)).toEqual(["always.sh", "git-only.sh"]);
+
+    const lsHandlers = resolveMatchingCodexHandlers(config, "PreToolUse", {
+      subject: "Bash",
+      toolName: "Bash",
+      toolInput: { command: "ls -la" },
+    });
+    expect(lsHandlers.map((h) => h.command)).toEqual(["always.sh"]);
   });
 });
 
@@ -315,8 +354,55 @@ describe("effectiveCodexHandlerTimeoutSec", () => {
     ]);
     expect(merged.ok).toBe(true);
     if (!merged.ok) return;
-    const handlers = resolveMatchingCodexHandlers(merged.config, "Stop", "");
+    const handlers = resolveMatchingCodexHandlers(merged.config, "Stop", { subject: "" });
     expect(effectiveCodexHandlerTimeoutSec(handlers[0]!)).toBe(5);
     expect(effectiveCodexHandlerTimeoutSec(handlers[1]!)).toBe(120);
+  });
+});
+
+describe("codexToolIfMatches", () => {
+  test("omitted if passes", () => {
+    expect(codexToolIfMatches("Bash", { command: "ls" }, undefined)).toBe(true);
+  });
+
+  test("Bash(git *) matches git commands", () => {
+    expect(codexToolIfMatches("Bash", { command: "git pull" }, "Bash(git *)")).toBe(true);
+    expect(codexToolIfMatches("Bash", { command: "rm -rf /" }, "Bash(git *)")).toBe(false);
+  });
+
+  test("wrong tool name fails", () => {
+    expect(codexToolIfMatches("Write", { file_path: "/x" }, "Bash(*)")).toBe(false);
+  });
+
+  test("malformed rule fails closed", () => {
+    expect(codexToolIfMatches("Bash", { command: "ls" }, "Bash(")).toBe(false);
+    expect(codexToolIfMatches("Bash", { command: "ls" }, "no-parens")).toBe(false);
+  });
+});
+
+describe("parseCodexHooksFile", () => {
+  test("validates a real-world hooks.json", () => {
+    const r = parseCodexHooksFile({
+      hooks: {
+        Stop: [{ hooks: [cmd("stop.sh", { timeout: 180 })] }],
+        PreToolUse: [{ hooks: [cmd("pre.sh", { timeout: 15 })] }],
+        SessionStart: [{ hooks: [cmd("start.sh", { timeout: 20 })] }],
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.config.Stop).toHaveLength(1);
+    expect(r.config.PreToolUse).toHaveLength(1);
+    expect(r.config.SessionStart).toHaveLength(1);
+  });
+
+  test("rejects invalid hooks structure", () => {
+    const r = parseCodexHooksFile({ hooks: { Stop: "bad" } });
+    expect(r.ok).toBe(false);
+  });
+
+  test("allows unknown top-level keys via .loose()", () => {
+    const r = parseCodexHooksFile({ hooks: {}, customField: true });
+    expect(r.ok).toBe(true);
   });
 });

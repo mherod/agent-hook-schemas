@@ -29,12 +29,12 @@ export const CodexNullableStringSchema = z.union([z.string(), z.null()]);
 
 const CodexTranscriptPathSchema = CodexNullableStringSchema;
 
-/** Shared Codex stdin fields (see Codex hooks “Common input fields”). */
+/** Shared Codex stdin fields (see Codex hooks "Common input fields"). All fields optional for resilient parsing. */
 export const CodexHookInputBaseSchema = z.object({
-  session_id: z.string(),
+  session_id: z.string().optional(),
   transcript_path: CodexTranscriptPathSchema.optional(),
-  cwd: z.string(),
-  model: z.string(),
+  cwd: z.string().optional(),
+  model: z.string().optional(),
 });
 export type CodexHookInputBase = z.infer<typeof CodexHookInputBaseSchema>;
 
@@ -44,9 +44,9 @@ export type CodexHookInputBase = z.infer<typeof CodexHookInputBaseSchema>;
  */
 export const CodexPreToolUseBashToolInputSchema = z
   .object({
-    command: z.string(),
+    command: z.string().optional(),
   })
-  .strict();
+  .loose();
 export type CodexPreToolUseBashToolInput = z.infer<typeof CodexPreToolUseBashToolInputSchema>;
 
 /**
@@ -68,15 +68,15 @@ export type CodexHookPermissionMode = z.infer<typeof CodexHookPermissionModeSche
  */
 export const CodexSessionStartInputSchema = z
   .object({
-    cwd: z.string(),
+    cwd: z.string().optional(),
     hook_event_name: z.literal("SessionStart"),
-    model: z.string(),
-    permission_mode: CodexHookPermissionModeSchema,
-    session_id: z.string(),
-    source: CodexSessionStartSourceSchema,
-    transcript_path: CodexNullableStringSchema,
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    source: CodexSessionStartSourceSchema.optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
   })
-  .strict();
+  .loose();
 export type CodexSessionStartInput = z.infer<typeof CodexSessionStartInputSchema>;
 
 /**
@@ -85,18 +85,18 @@ export type CodexSessionStartInput = z.infer<typeof CodexSessionStartInputSchema
  */
 export const CodexPreToolUseInputSchema = z
   .object({
-    cwd: z.string(),
+    cwd: z.string().optional(),
     hook_event_name: z.literal("PreToolUse"),
-    model: z.string(),
-    permission_mode: CodexHookPermissionModeSchema,
-    session_id: z.string(),
-    tool_input: CodexPreToolUseBashToolInputSchema,
-    tool_name: z.literal("Bash"),
-    tool_use_id: z.string(),
-    transcript_path: CodexNullableStringSchema,
-    turn_id: z.string(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    tool_input: CodexPreToolUseBashToolInputSchema.optional(),
+    tool_name: z.string().optional(),
+    tool_use_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
   })
-  .strict();
+  .loose();
 export type CodexPreToolUseInput = z.infer<typeof CodexPreToolUseInputSchema>;
 
 /**
@@ -112,19 +112,19 @@ export type CodexPostToolUseBashToolInput = z.infer<typeof CodexPostToolUseBashT
  */
 export const CodexPostToolUseInputSchema = z
   .object({
-    cwd: z.string(),
+    cwd: z.string().optional(),
     hook_event_name: z.literal("PostToolUse"),
-    model: z.string(),
-    permission_mode: CodexHookPermissionModeSchema,
-    session_id: z.string(),
-    tool_input: CodexPostToolUseBashToolInputSchema,
-    tool_name: z.literal("Bash"),
-    tool_response: z.unknown(),
-    tool_use_id: z.string(),
-    transcript_path: CodexNullableStringSchema,
-    turn_id: z.string(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    tool_input: CodexPostToolUseBashToolInputSchema.optional(),
+    tool_name: z.string().optional(),
+    tool_response: z.unknown().optional(),
+    tool_use_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
   })
-  .strict();
+  .loose();
 export type CodexPostToolUseInput = z.infer<typeof CodexPostToolUseInputSchema>;
 
 /**
@@ -133,16 +133,16 @@ export type CodexPostToolUseInput = z.infer<typeof CodexPostToolUseInputSchema>;
  */
 export const CodexUserPromptSubmitInputSchema = z
   .object({
-    cwd: z.string(),
+    cwd: z.string().optional(),
     hook_event_name: z.literal("UserPromptSubmit"),
-    model: z.string(),
-    permission_mode: CodexHookPermissionModeSchema,
-    prompt: z.string(),
-    session_id: z.string(),
-    transcript_path: CodexNullableStringSchema,
-    turn_id: z.string(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    prompt: z.string().optional(),
+    session_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
   })
-  .strict();
+  .loose();
 export type CodexUserPromptSubmitInput = z.infer<typeof CodexUserPromptSubmitInputSchema>;
 
 /** @deprecated Use {@link CodexHookPermissionModeSchema} (same schema). */
@@ -155,17 +155,17 @@ export type CodexStopPermissionMode = CodexHookPermissionMode;
  */
 export const CodexStopInputSchema = z
   .object({
-    cwd: z.string(),
+    cwd: z.string().optional(),
     hook_event_name: z.literal("Stop"),
-    last_assistant_message: CodexNullableStringSchema,
-    model: z.string(),
-    permission_mode: CodexHookPermissionModeSchema,
-    session_id: z.string(),
-    stop_hook_active: z.boolean(),
-    transcript_path: CodexNullableStringSchema,
-    turn_id: z.string(),
+    last_assistant_message: CodexNullableStringSchema.optional(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    stop_hook_active: z.boolean().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
   })
-  .strict();
+  .loose();
 export type CodexStopInput = z.infer<typeof CodexStopInputSchema>;
 
 /** Discriminated union for Codex command-hook stdin. */
@@ -443,105 +443,18 @@ export function ParseCodexHookInput(json: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// Config merge + handler resolution (Codex hooks docs)
+// Config merge + handler resolution -- see codex-hooks-integration.ts
+// Re-exported here for backward compatibility.
 // ---------------------------------------------------------------------------
 
-const CODEX_HOOK_EVENTS = CodexHookEventNameSchema.options;
-
-/**
- * Codex loads every `hooks.json` from active config layers; higher-precedence
- * layers do not replace lower-precedence hooks — matcher groups are concatenated
- * per event (see Codex hooks docs).
- */
-export function mergeCodexHooksFiles(
-  files: unknown[],
-):
-  | { ok: true; config: CodexHooksConfig }
-  | { ok: false; index: number; error: z.ZodError } {
-  const merged: CodexHooksConfig = {};
-  for (let i = 0; i < files.length; i++) {
-    const parsed = CodexHooksFileSchema.safeParse(files[i]);
-    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
-    const hooks = parsed.data.hooks;
-    for (const event of CODEX_HOOK_EVENTS) {
-      const groups = hooks[event];
-      if (!groups?.length) continue;
-      merged[event] = [...(merged[event] ?? []), ...groups];
-    }
-  }
-  return { ok: true, config: merged };
-}
-
-/**
- * `matcher` is a regex on the subject field (tool name or session source), or
- * match-all when omitted, `""`, or `"*"` (Codex hooks docs).
- */
-export function codexMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  if (matcher === undefined || matcher === "" || matcher === "*") return true;
-  try {
-    return new RegExp(matcher).test(subject);
-  } catch {
-    return false;
-  }
-}
-
-function codexMatcherIgnoredForEvent(
-  event: CodexHookEventName,
-): event is "UserPromptSubmit" | "Stop" {
-  return event === "UserPromptSubmit" || event === "Stop";
-}
-
-/**
- * Returns all command handlers that would run for this event and subject, in
- * merge order then matcher-group order. Codex launches them concurrently; this
- * list is the integration surface for “what runs”.
- */
-export function resolveMatchingCodexHandlers(
-  config: CodexHooksConfig,
-  event: CodexHookEventName,
-  subject: string,
-): CodexCommandHookHandler[] {
-  const groups = config[event];
-  if (!groups?.length) return [];
-
-  const out: CodexCommandHookHandler[] = [];
-  if (codexMatcherIgnoredForEvent(event)) {
-    for (const g of groups) out.push(...g.hooks);
-    return out;
-  }
-  for (const g of groups) {
-    if (codexMatcherMatches(g.matcher, subject)) out.push(...g.hooks);
-  }
-  return out;
-}
-
-function subjectForCodexInput(input: CodexHookEventInput): string {
-  switch (input.hook_event_name) {
-    case "SessionStart":
-      return input.source;
-    case "PreToolUse":
-    case "PostToolUse":
-      return input.tool_name;
-    default:
-      return "";
-  }
-}
-
-/** Resolve handlers from merged config + parsed stdin (wire) payload. */
-export function resolveMatchingCodexHandlersFromInput(
-  config: CodexHooksConfig,
-  input: CodexHookEventInput,
-): CodexCommandHookHandler[] {
-  const event = input.hook_event_name;
-  if (codexMatcherIgnoredForEvent(event)) {
-    return resolveMatchingCodexHandlers(config, event, "");
-  }
-  return resolveMatchingCodexHandlers(config, event, subjectForCodexInput(input));
-}
-
-/** Effective timeout in seconds: explicit `timeout` wins over `timeoutSec`; default 600. */
-export function effectiveCodexHandlerTimeoutSec(
-  handler: Pick<CodexCommandHookHandler, "timeout" | "timeoutSec">,
-): number {
-  return handler.timeout ?? handler.timeoutSec ?? 600;
-}
+export {
+  codexMatcherMatches,
+  codexResolutionContextFromInput,
+  codexToolIfMatches,
+  effectiveCodexHandlerTimeoutSec,
+  mergeCodexHooksFiles,
+  parseCodexHooksFile,
+  resolveMatchingCodexHandlers,
+  resolveMatchingCodexHandlersFromInput,
+  type CodexHookResolutionContext,
+} from "./codex-hooks-integration.ts";

@@ -6,6 +6,7 @@ export default defineConfig({
     "claude.ts",
     "claude-hooks-integration.ts",
     "codex.ts",
+    "codex-hooks-integration.ts",
     "common.ts",
     "cursor.ts",
     "gemini.ts",

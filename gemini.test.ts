@@ -15,6 +15,8 @@ import {
   effectiveGeminiHandlerTimeoutMs,
   geminiMatcherMatches,
   mergeGeminiHooksFiles,
+  parseGeminiSettings,
+  resolveMatchingGeminiHandlerGroups,
   resolveMatchingGeminiHandlers,
   resolveMatchingGeminiHandlersFromInput,
 } from "./gemini-hooks-integration.ts";
@@ -181,15 +183,15 @@ describe("Gemini hooks (merge + resolve)", () => {
 });
 
 describe("Gemini hooks (stdin)", () => {
-  test("SessionStart requires source", () => {
-    const bad = ParseGeminiHookInput({ ...baseStdin, hook_event_name: "SessionStart" });
-    expect(bad.success).toBe(false);
-    const ok = ParseGeminiHookInput({
+  test("SessionStart accepts partial payload (resilient parsing)", () => {
+    const partial = ParseGeminiHookInput({ ...baseStdin, hook_event_name: "SessionStart" });
+    expect(partial.success).toBe(true);
+    const full = ParseGeminiHookInput({
       ...baseStdin,
       hook_event_name: "SessionStart",
       source: "startup",
     });
-    expect(ok.success).toBe(true);
+    expect(full.success).toBe(true);
   });
 
   test("SessionStart accepts Gemini CLI sample (paths + ISO timestamp)", () => {
@@ -258,6 +260,79 @@ describe("Gemini hooks (optional /private/tmp capture files)", () => {
       if (r.success) expect(r.data.hook_event_name).toBe(event);
     });
   }
+});
+
+describe("Gemini hooks (sequential-aware resolution)", () => {
+  const cmd = (c: string, extra?: Partial<{ timeout: number }>) => ({
+    type: "command" as const,
+    command: c,
+    ...extra,
+  });
+
+  test("resolveMatchingGeminiHandlerGroups preserves sequential flag", () => {
+    const config = GeminiHooksConfigSchema.parse({
+      BeforeTool: [
+        { matcher: "write_.*", sequential: true, hooks: [cmd("a.sh"), cmd("b.sh")] },
+        { hooks: [cmd("c.sh")] },
+      ],
+    });
+    const groups = resolveMatchingGeminiHandlerGroups(config, "BeforeTool", "write_file");
+    expect(groups).toHaveLength(2);
+    expect(groups[0]?.sequential).toBe(true);
+    expect(groups[0]?.handlers.map((h) => h.command)).toEqual(["a.sh", "b.sh"]);
+    expect(groups[1]?.sequential).toBe(false);
+    expect(groups[1]?.handlers.map((h) => h.command)).toEqual(["c.sh"]);
+  });
+
+  test("resolveMatchingGeminiHandlerGroups defaults sequential to false", () => {
+    const config = GeminiHooksConfigSchema.parse({
+      AfterTool: [{ matcher: ".*", hooks: [cmd("x.sh")] }],
+    });
+    const groups = resolveMatchingGeminiHandlerGroups(config, "AfterTool", "read_file");
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.sequential).toBe(false);
+  });
+
+  test("non-matching groups are excluded", () => {
+    const config = GeminiHooksConfigSchema.parse({
+      BeforeTool: [
+        { matcher: "write_.*", hooks: [cmd("write.sh")] },
+        { matcher: "read_.*", hooks: [cmd("read.sh")] },
+      ],
+    });
+    const groups = resolveMatchingGeminiHandlerGroups(config, "BeforeTool", "read_file");
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.handlers[0]?.command).toBe("read.sh");
+  });
+});
+
+describe("Gemini settings validation", () => {
+  test("parseGeminiSettings validates a settings.json with hooks", () => {
+    const r = parseGeminiSettings({
+      hooks: {
+        BeforeTool: [
+          {
+            matcher: "write_.*",
+            sequential: true,
+            hooks: [{ type: "command", command: "echo ok", timeout: 5000 }],
+          },
+        ],
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.settings.hooks?.BeforeTool).toHaveLength(1);
+  });
+
+  test("parseGeminiSettings allows unknown top-level keys", () => {
+    const r = parseGeminiSettings({ customSetting: true });
+    expect(r.ok).toBe(true);
+  });
+
+  test("parseGeminiSettings rejects invalid hooks structure", () => {
+    const r = parseGeminiSettings({ hooks: { BeforeTool: "bad" } });
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe("Gemini hooks (stdout)", () => {

@@ -1,12 +1,16 @@
 import { z } from "zod";
 import {
   ClaudeSettingsFragmentSchema,
+  ClaudeSettingsSchema,
   HookEventNameSchema,
   LooksLikeMcpToolName,
+  type ClaudeSettings,
   type HookEventInput,
   type HookEventName,
   type HookHandler,
   type HooksConfig,
+  type PermissionRuleString,
+  type SettingsPermissions,
 } from "./claude.ts";
 
 const CLAUDE_HOOK_EVENTS = HookEventNameSchema.options;
@@ -25,14 +29,20 @@ export type ClaudeHookResolutionContext = {
  * Merge hook matcher groups from multiple Claude settings fragments (user + project + local +
  * policy order is a caller concern). Later entries append after earlier ones per event, like Codex
  * `hooks.json` discovery.
+ *
+ * A layer with `disableAllHooks: true` clears all hooks accumulated so far — subsequent layers
+ * can re-add hooks after the disable (matching Claude Code's layered settings precedence).
  */
 export function mergeClaudeHooksFiles(
   files: unknown[],
 ): { ok: true; config: HooksConfig } | { ok: false; index: number; error: z.ZodError } {
-  const merged: HooksConfig = {};
+  let merged: HooksConfig = {};
   for (let i = 0; i < files.length; i++) {
     const parsed = ClaudeSettingsFragmentSchema.safeParse(files[i]);
     if (!parsed.success) return { ok: false, index: i, error: parsed.error };
+    if (parsed.data.disableAllHooks) {
+      merged = {};
+    }
     const hooks = parsed.data.hooks;
     if (!hooks) continue;
     for (const event of CLAUDE_HOOK_EVENTS) {
@@ -246,4 +256,162 @@ export function resolveMatchingClaudeHandlersFromInput(
 /** Effective timeout in seconds (Claude command/http handlers; default 600 when omitted). */
 export function effectiveClaudeHandlerTimeoutSec(handler: Pick<HookHandler, "timeout">): number {
   return handler.timeout ?? 600;
+}
+
+// ---------------------------------------------------------------------------
+// Permission rule matching (settings.json `permissions.allow` / `permissions.deny`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a permission rule string into tool name and optional glob pattern.
+ * Rules follow the same `Tool(glob)` syntax as hook handler `if`, e.g.
+ * `"Bash(git *)"`, `"Edit(*.ts)"`, or bare `"Read"`.
+ *
+ * Returns `undefined` for malformed rules.
+ */
+export function parsePermissionRule(
+  rule: PermissionRuleString,
+): { toolName: string; pattern: string | undefined } | undefined {
+  const parenOpen = rule.indexOf("(");
+  if (parenOpen === -1) {
+    const toolName = rule.trim();
+    return toolName ? { toolName, pattern: undefined } : undefined;
+  }
+  const parenClose = rule.lastIndexOf(")");
+  if (parenClose <= parenOpen) return undefined;
+  const toolName = rule.slice(0, parenOpen).trim();
+  if (!toolName) return undefined;
+  const pattern = rule.slice(parenOpen + 1, parenClose).trim();
+  return { toolName, pattern: pattern || undefined };
+}
+
+/**
+ * Whether a permission rule matches a given tool call. Uses the same glob matching
+ * semantics as hook `if` guards via {@link claudeToolIfMatches}.
+ *
+ * Bare rules (e.g. `"Bash"`) match all invocations of that tool.
+ * Rules with a glob (e.g. `"Bash(git *)"`) match only when the tool input satisfies the glob.
+ */
+export function claudePermissionRuleMatches(
+  rule: PermissionRuleString,
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): boolean {
+  const parsed = parsePermissionRule(rule);
+  if (!parsed) return false;
+  if (parsed.toolName !== toolName) {
+    // Support colon-separated patterns like "Bash(git status:*)"
+    // where the colon is part of the glob, not a tool:pattern separator
+    if (!rule.startsWith(`${toolName}(`)) return false;
+  }
+  if (!parsed.pattern) return parsed.toolName === toolName;
+  return claudeToolIfMatches(toolName, toolInput, rule);
+}
+
+/**
+ * Check whether a tool call is allowed, denied, or unspecified by the
+ * `permissions` block of a settings file.
+ *
+ * Evaluation order (matching Claude Code behaviour):
+ * 1. If any `deny` rule matches → `"deny"`
+ * 2. If any `allow` rule matches → `"allow"`
+ * 3. Otherwise → `undefined` (falls through to permission mode / prompt)
+ */
+export function evaluateSettingsPermissions(
+  permissions: SettingsPermissions | undefined,
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): "allow" | "deny" | undefined {
+  if (!permissions) return undefined;
+  if (permissions.deny?.some((r) => claudePermissionRuleMatches(r, toolName, toolInput))) {
+    return "deny";
+  }
+  if (permissions.allow?.some((r) => claudePermissionRuleMatches(r, toolName, toolInput))) {
+    return "allow";
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Full settings merge (hooks + permissions + env)
+// ---------------------------------------------------------------------------
+
+/** Result of merging multiple complete settings layers. */
+export type MergedClaudeSettings = {
+  hooks: HooksConfig;
+  permissions: SettingsPermissions;
+  env: Record<string, string>;
+  disableAllHooks: boolean;
+};
+
+/**
+ * Merge complete Claude settings layers (user → project → local → policy order).
+ *
+ * - **Hooks** are appended per event (same as {@link mergeClaudeHooksFiles}), with
+ *   `disableAllHooks` clearing accumulated hooks at the layer that sets it.
+ * - **Permissions** `allow`/`deny` arrays are concatenated across layers.
+ * - **Env** vars are shallow-merged (later layers override earlier ones).
+ */
+export function mergeClaudeSettings(
+  files: unknown[],
+):
+  | { ok: true; settings: MergedClaudeSettings }
+  | { ok: false; index: number; error: z.ZodError } {
+  let hooks: HooksConfig = {};
+  let disableAllHooks = false;
+  const allow: PermissionRuleString[] = [];
+  const deny: PermissionRuleString[] = [];
+  const env: Record<string, string> = {};
+
+  for (let i = 0; i < files.length; i++) {
+    const parsed = ClaudeSettingsSchema.safeParse(files[i]);
+    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
+    const data = parsed.data;
+
+    // Hooks
+    if (data.disableAllHooks) {
+      hooks = {};
+      disableAllHooks = true;
+    }
+    if (data.hooks) {
+      for (const event of CLAUDE_HOOK_EVENTS) {
+        const list = data.hooks[event];
+        if (!list?.length) continue;
+        hooks[event] = [...(hooks[event] ?? []), ...list];
+      }
+    }
+
+    // Permissions
+    if (data.permissions?.allow) allow.push(...data.permissions.allow);
+    if (data.permissions?.deny) deny.push(...data.permissions.deny);
+
+    // Env
+    if (data.env) Object.assign(env, data.env);
+  }
+
+  return {
+    ok: true,
+    settings: {
+      hooks,
+      permissions: {
+        ...(allow.length ? { allow } : {}),
+        ...(deny.length ? { deny } : {}),
+      },
+      env,
+      disableAllHooks,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/** Validate a complete `settings.json` file. Returns typed settings or Zod error. */
+export function parseClaudeSettings(json: unknown):
+  | { ok: true; settings: ClaudeSettings }
+  | { ok: false; error: z.ZodError } {
+  const result = ClaudeSettingsSchema.safeParse(json);
+  if (!result.success) return { ok: false, error: result.error };
+  return { ok: true, settings: result.data };
 }

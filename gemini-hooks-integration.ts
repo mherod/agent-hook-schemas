@@ -4,8 +4,10 @@ import {
   type GeminiHookEventInput,
   type GeminiHookEventName,
   type GeminiHooksConfig,
+  type GeminiSettings,
   GeminiHookEventNameSchema,
   GeminiHooksConfigSchema,
+  GeminiSettingsSchema,
   geminiMatcherPatternCompiles,
 } from "./gemini.ts";
 
@@ -84,19 +86,19 @@ export function resolveMatchingGeminiHandlers(
 function subjectForGeminiInput(input: GeminiHookEventInput): string {
   switch (input.hook_event_name) {
     case "SessionStart":
-      return input.source;
+      return input.source ?? "";
     case "SessionEnd":
-      return input.reason;
+      return input.reason ?? "";
     case "BeforeAgent":
     case "AfterAgent":
-      return input.prompt;
+      return input.prompt ?? "";
     case "BeforeTool":
     case "AfterTool":
-      return input.tool_name;
+      return input.tool_name ?? "";
     case "PreCompress":
-      return input.trigger;
+      return input.trigger ?? "";
     case "Notification":
-      return input.notification_type;
+      return input.notification_type ?? "";
     default:
       return "";
   }
@@ -119,4 +121,52 @@ export function effectiveGeminiHandlerTimeoutMs(
   handler: Pick<GeminiCommandHookHandler, "timeout">,
 ): number {
   return handler.timeout ?? 60_000;
+}
+
+// ---------------------------------------------------------------------------
+// Sequential-aware resolution
+// ---------------------------------------------------------------------------
+
+/** A resolved handler group preserving the `sequential` execution mode from the matcher group. */
+export type GeminiResolvedHandlerGroup = {
+  sequential: boolean;
+  handlers: GeminiCommandHookHandler[];
+};
+
+/**
+ * Like {@link resolveMatchingGeminiHandlers} but preserves the `sequential` flag from
+ * each matcher group. Gemini CLI runs hooks within a `sequential: true` group one at a
+ * time (in order); groups without `sequential` (or `false`) run concurrently.
+ *
+ * Returns groups in merge order — the caller decides execution strategy per group.
+ */
+export function resolveMatchingGeminiHandlerGroups(
+  config: GeminiHooksConfig,
+  event: GeminiHookEventName,
+  subject: string,
+): GeminiResolvedHandlerGroup[] {
+  const groups = config[event];
+  if (!groups?.length) return [];
+  const out: GeminiResolvedHandlerGroup[] = [];
+  for (const g of groups) {
+    if (!geminiMatcherMatches(event, g.matcher, subject)) continue;
+    out.push({
+      sequential: g.sequential ?? false,
+      handlers: g.hooks,
+    });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/** Validate a complete Gemini `settings.json` file. Returns typed settings or Zod error. */
+export function parseGeminiSettings(json: unknown):
+  | { ok: true; settings: GeminiSettings }
+  | { ok: false; error: z.ZodError } {
+  const result = GeminiSettingsSchema.safeParse(json);
+  if (!result.success) return { ok: false, error: result.error };
+  return { ok: true, settings: result.data };
 }

@@ -370,12 +370,12 @@ export const AgentHookContextSchema = z.object({
 });
 export type AgentHookContext = z.infer<typeof AgentHookContextSchema>;
 
-/** Shared stdin fields for most hook events (+ optional subagent context). */
+/** Shared stdin fields for most hook events (+ optional subagent context). All fields optional for resilient parsing. */
 export const HookInputBaseSchema = z
   .object({
-    session_id: z.string(),
+    session_id: z.string().optional(),
     transcript_path: z.string().optional(),
-    cwd: z.string(),
+    cwd: z.string().optional(),
     permission_mode: PermissionModeSchema.optional(),
   })
   .extend(AgentHookContextSchema.partial().shape);
@@ -407,15 +407,15 @@ const TaskTimelinePayloadSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const SessionStartInputSchema = hookStdinLoose("SessionStart", {
-  source: SessionStartSourceSchema,
-  model: z.string(),
+  source: SessionStartSourceSchema.optional(),
+  model: z.string().optional(),
 });
 export type SessionStartInput = z.infer<typeof SessionStartInputSchema>;
 
 export const InstructionsLoadedInputSchema = hookStdinLoose("InstructionsLoaded", {
-  file_path: z.string(),
-  memory_type: MemoryTypeSchema,
-  load_reason: InstructionsLoadReasonSchema,
+  file_path: z.string().optional(),
+  memory_type: MemoryTypeSchema.optional(),
+  load_reason: InstructionsLoadReasonSchema.optional(),
   globs: z.array(z.string()).optional(),
   trigger_file_path: z.string().optional(),
   parent_file_path: z.string().optional(),
@@ -423,22 +423,22 @@ export const InstructionsLoadedInputSchema = hookStdinLoose("InstructionsLoaded"
 export type InstructionsLoadedInput = z.infer<typeof InstructionsLoadedInputSchema>;
 
 export const UserPromptSubmitInputSchema = hookStdinLoose("UserPromptSubmit", {
-  prompt: z.string(),
+  prompt: z.string().optional(),
 });
 export type UserPromptSubmitInput = z.infer<typeof UserPromptSubmitInputSchema>;
 
 export const PreToolUseInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PreToolUse"),
 })
-  .extend(ToolCallCoreSchema.shape)
-  .extend({ tool_use_id: z.string() })
+  .extend(ToolCallCoreSchema.partial().shape)
+  .extend({ tool_use_id: z.string().optional() })
   .loose();
 export type PreToolUseInput = z.infer<typeof PreToolUseInputSchema>;
 
 export const PermissionRequestInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PermissionRequest"),
 })
-  .extend(ToolCallCoreSchema.shape)
+  .extend(ToolCallCoreSchema.partial().shape)
   .extend({
     permission_suggestions: z.array(PermissionSuggestionSchema).optional(),
   })
@@ -448,10 +448,10 @@ export type PermissionRequestInput = z.infer<typeof PermissionRequestInputSchema
 export const PostToolUseInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PostToolUse"),
 })
-  .extend(ToolCallCoreSchema.shape)
+  .extend(ToolCallCoreSchema.partial().shape)
   .extend({
-    tool_response: JsonObjectSchema,
-    tool_use_id: z.string(),
+    tool_response: JsonObjectSchema.optional(),
+    tool_use_id: z.string().optional(),
   })
   .loose();
 export type PostToolUseInput = z.infer<typeof PostToolUseInputSchema>;
@@ -459,10 +459,10 @@ export type PostToolUseInput = z.infer<typeof PostToolUseInputSchema>;
 export const PostToolUseFailureInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PostToolUseFailure"),
 })
-  .extend(ToolCallCoreSchema.shape)
+  .extend(ToolCallCoreSchema.partial().shape)
   .extend({
-    tool_use_id: z.string(),
-    error: z.string(),
+    tool_use_id: z.string().optional(),
+    error: z.string().optional(),
     is_interrupt: z.boolean().optional(),
   })
   .loose();
@@ -471,117 +471,117 @@ export type PostToolUseFailureInput = z.infer<typeof PostToolUseFailureInputSche
 export const PermissionDeniedInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PermissionDenied"),
 })
-  .extend(ToolCallCoreSchema.shape)
+  .extend(ToolCallCoreSchema.partial().shape)
   .extend({
-    tool_use_id: z.string(),
-    reason: z.string(),
+    tool_use_id: z.string().optional(),
+    reason: z.string().optional(),
   })
   .loose();
 export type PermissionDeniedInput = z.infer<typeof PermissionDeniedInputSchema>;
 
 export const NotificationInputSchema = hookStdinLoose("Notification", {
-  message: z.string(),
+  message: z.string().optional(),
   title: z.string().optional(),
-  notification_type: NotificationTypeSchema,
+  notification_type: NotificationTypeSchema.optional(),
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
 
 export const SubagentStartInputSchema = hookStdinLoose("SubagentStart", {
-  agent_id: z.string(),
-  agent_type: z.string(),
+  agent_id: z.string().optional(),
+  agent_type: z.string().optional(),
 });
 export type SubagentStartInput = z.infer<typeof SubagentStartInputSchema>;
 
 export const SubagentStopInputSchema = hookStdinLoose("SubagentStop", {
-  stop_hook_active: z.boolean(),
-  agent_id: z.string(),
-  agent_type: z.string(),
-  agent_transcript_path: z.string(),
-  last_assistant_message: z.string(),
+  stop_hook_active: z.boolean().optional(),
+  agent_id: z.string().optional(),
+  agent_type: z.string().optional(),
+  agent_transcript_path: z.string().optional(),
+  last_assistant_message: z.string().optional(),
 });
 export type SubagentStopInput = z.infer<typeof SubagentStopInputSchema>;
 
 export const TaskCreatedInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("TaskCreated"),
 })
-  .extend(TaskTimelinePayloadSchema.shape)
+  .extend(TaskTimelinePayloadSchema.partial().shape)
   .loose();
 export type TaskCreatedInput = z.infer<typeof TaskCreatedInputSchema>;
 
 export const TaskCompletedInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("TaskCompleted"),
 })
-  .extend(TaskTimelinePayloadSchema.shape)
+  .extend(TaskTimelinePayloadSchema.partial().shape)
   .loose();
 export type TaskCompletedInput = z.infer<typeof TaskCompletedInputSchema>;
 
 export const StopInputSchema = hookStdinLoose("Stop", {
-  stop_hook_active: z.boolean(),
-  last_assistant_message: z.string(),
+  stop_hook_active: z.boolean().optional(),
+  last_assistant_message: z.string().optional(),
 });
 export type StopInput = z.infer<typeof StopInputSchema>;
 
 export const StopFailureInputSchema = hookStdinLoose("StopFailure", {
-  error: StopFailureErrorSchema,
+  error: StopFailureErrorSchema.optional(),
   error_details: z.string().optional(),
   last_assistant_message: z.string().optional(),
 });
 export type StopFailureInput = z.infer<typeof StopFailureInputSchema>;
 
 export const TeammateIdleInputSchema = hookStdinLoose("TeammateIdle", {
-  teammate_name: z.string(),
-  team_name: z.string(),
+  teammate_name: z.string().optional(),
+  team_name: z.string().optional(),
 });
 export type TeammateIdleInput = z.infer<typeof TeammateIdleInputSchema>;
 
 export const ConfigChangeInputSchema = hookStdinLoose("ConfigChange", {
-  source: ConfigChangeSourceSchema,
+  source: ConfigChangeSourceSchema.optional(),
   file_path: z.string().optional(),
 });
 export type ConfigChangeInput = z.infer<typeof ConfigChangeInputSchema>;
 
 export const CwdChangedInputSchema = hookStdinLoose("CwdChanged", {
-  old_cwd: z.string(),
-  new_cwd: z.string(),
+  old_cwd: z.string().optional(),
+  new_cwd: z.string().optional(),
 });
 export type CwdChangedInput = z.infer<typeof CwdChangedInputSchema>;
 
 export const FileChangedInputSchema = hookStdinLoose("FileChanged", {
-  file_path: z.string(),
-  event: FileWatchEventSchema,
+  file_path: z.string().optional(),
+  event: FileWatchEventSchema.optional(),
 });
 export type FileChangedInput = z.infer<typeof FileChangedInputSchema>;
 
 export const WorktreeCreateInputSchema = hookStdinLoose("WorktreeCreate", {
-  name: z.string(),
+  name: z.string().optional(),
 });
 export type WorktreeCreateInput = z.infer<typeof WorktreeCreateInputSchema>;
 
 export const WorktreeRemoveInputSchema = hookStdinLoose("WorktreeRemove", {
-  worktree_path: z.string(),
+  worktree_path: z.string().optional(),
 });
 export type WorktreeRemoveInput = z.infer<typeof WorktreeRemoveInputSchema>;
 
 export const PreCompactInputSchema = hookStdinLoose("PreCompact", {
-  trigger: CompactTriggerSchema,
-  custom_instructions: z.string(),
+  trigger: CompactTriggerSchema.optional(),
+  custom_instructions: z.string().optional(),
 });
 export type PreCompactInput = z.infer<typeof PreCompactInputSchema>;
 
 export const PostCompactInputSchema = hookStdinLoose("PostCompact", {
-  trigger: CompactTriggerSchema,
-  compact_summary: z.string(),
+  trigger: CompactTriggerSchema.optional(),
+  compact_summary: z.string().optional(),
 });
 export type PostCompactInput = z.infer<typeof PostCompactInputSchema>;
 
 export const SessionEndInputSchema = hookStdinLoose("SessionEnd", {
-  reason: SessionEndReasonSchema,
+  reason: SessionEndReasonSchema.optional(),
 });
 export type SessionEndInput = z.infer<typeof SessionEndInputSchema>;
 
 export const ElicitationInputSchema = hookStdinLoose("Elicitation", {
-  mcp_server_name: z.string(),
-  message: z.string(),
+  mcp_server_name: z.string().optional(),
+  message: z.string().optional(),
   mode: ElicitationModeSchema.optional(),
   url: z.string().optional(),
   elicitation_id: z.string().optional(),
@@ -590,8 +590,8 @@ export const ElicitationInputSchema = hookStdinLoose("Elicitation", {
 export type ElicitationInput = z.infer<typeof ElicitationInputSchema>;
 
 const ElicitationResultPayloadSchema = z.object({
-  mcp_server_name: z.string(),
-  action: ElicitationActionSchema,
+  mcp_server_name: z.string().optional(),
+  action: ElicitationActionSchema.optional(),
   mode: ElicitationModeSchema.optional(),
   elicitation_id: z.string().optional(),
   content: JsonObjectSchema.optional(),
@@ -847,9 +847,106 @@ export const ClaudeSettingsHooksSchema = z.object({
 });
 export type ClaudeSettingsHooks = z.infer<typeof ClaudeSettingsHooksSchema>;
 
+// ---------------------------------------------------------------------------
+// Settings: permission rules (allow / deny lists in settings.json)
+// ---------------------------------------------------------------------------
+
+/**
+ * Individual permission rule string as it appears in `permissions.allow` or
+ * `permissions.deny` arrays. Same `Tool(glob)` syntax as hook handler `if`.
+ *
+ * Examples: `"Bash(git *)"`, `"Edit"`, `"WebFetch(domain:*.example.com)"`.
+ */
+export const PermissionRuleStringSchema = z.string().min(1);
+export type PermissionRuleString = z.infer<typeof PermissionRuleStringSchema>;
+
+export const SettingsPermissionsSchema = z.object({
+  allow: z.array(PermissionRuleStringSchema).optional(),
+  deny: z.array(PermissionRuleStringSchema).optional(),
+});
+export type SettingsPermissions = z.infer<typeof SettingsPermissionsSchema>;
+
+// ---------------------------------------------------------------------------
+// Settings: attribution, env, plugins, statusLine
+// ---------------------------------------------------------------------------
+
+export const SettingsAttributionSchema = z.object({
+  commit: z.string().optional(),
+  pr: z.string().optional(),
+});
+export type SettingsAttribution = z.infer<typeof SettingsAttributionSchema>;
+
+export const StatusLineCommandSchema = z.object({
+  type: z.literal("command"),
+  command: z.string(),
+});
+export type StatusLineCommand = z.infer<typeof StatusLineCommandSchema>;
+
+export const PluginSourceSchema = z.object({
+  source: z.object({
+    source: z.string(),
+    repo: z.string(),
+  }),
+});
+
+export const SettingsPluginsSchema = z.object({
+  user: z.record(z.string(), z.string()).optional(),
+});
+export type SettingsPlugins = z.infer<typeof SettingsPluginsSchema>;
+
+export const TeammateModeSchema = z.enum(["tmux", "tabs"]);
+export type TeammateMode = z.infer<typeof TeammateModeSchema>;
+
+// ---------------------------------------------------------------------------
+// Settings: full settings.json schema
+// ---------------------------------------------------------------------------
+
+/**
+ * Complete `~/.claude/settings.json` schema modelling hooks, permissions,
+ * environment, plugins, and all known top-level fields.
+ *
+ * Every field is optional so the schema validates partial / layered files
+ * (user, project, local, policy).
+ */
+export const ClaudeSettingsSchema = z
+  .object({
+    // Hooks
+    hooks: HooksConfigSchema.optional(),
+    disableAllHooks: z.boolean().optional(),
+
+    // Permissions
+    permissions: SettingsPermissionsSchema.optional(),
+    defaultMode: PermissionModeSchema.optional(),
+
+    // Environment
+    env: z.record(z.string(), z.string()).optional(),
+
+    // Attribution
+    attribution: SettingsAttributionSchema.optional(),
+
+    // Plugins
+    enabledPlugins: z.record(z.string(), z.boolean()).optional(),
+    plugins: SettingsPluginsSchema.optional(),
+    extraKnownMarketplaces: z.record(z.string(), PluginSourceSchema).optional(),
+
+    // UI / UX
+    statusLine: StatusLineCommandSchema.optional(),
+    teammateMode: TeammateModeSchema.optional(),
+
+    // Misc
+    effortLevel: z.string().optional(),
+    autoUpdatesChannel: z.string().optional(),
+    voiceEnabled: z.boolean().optional(),
+    skipDangerousModePermissionPrompt: z.boolean().optional(),
+  })
+  .loose();
+export type ClaudeSettings = z.infer<typeof ClaudeSettingsSchema>;
+
 /**
  * Fragment of `~/.claude/settings.json` or `.claude/settings.json` that
  * configures hooks. Other keys are allowed (`.loose()`).
+ *
+ * For the full settings shape, see {@link ClaudeSettingsSchema}.
  */
 export const ClaudeSettingsFragmentSchema = z
   .object({
