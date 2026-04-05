@@ -1171,6 +1171,75 @@ export type PermissionRequestAllowAcceptEditsSessionStdout = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
+// Downstream-friendly variants for consumer-side hook validation
+// ---------------------------------------------------------------------------
+
+/**
+ * All-optional variant of HookInputBaseSchema for resilient downstream parsing.
+ * Hooks must tolerate missing fields; this schema accepts partial payloads.
+ * Use when consuming hooks in downstream apps that need graceful degradation.
+ */
+export const HookInputBaseSchemaPartial = HookInputBaseSchema.partial().catchall(z.unknown());
+export type HookInputBasePartial = z.infer<typeof HookInputBaseSchemaPartial>;
+
+/**
+ * Shared base for tool-shaped hook events (PreToolUse, PostToolUse, PostToolUseFailure).
+ * Combines HookInputBaseSchema with tool call metadata for custom tool input parsers.
+ * Enables downstream consumers to build uniform parsers for tool-related events.
+ */
+export const ToolHookInputBaseSchema = HookInputBaseSchema.extend({
+  tool_name: z.string().optional(),
+  tool_use_id: z.string().optional(),
+  tool_input: z.record(z.string(), z.unknown()).optional(),
+}).loose();
+export type ToolHookInputBase = z.infer<typeof ToolHookInputBaseSchema>;
+
+/**
+ * Pre-commit Git hook event schema.
+ * Triggered before git commit validation (linting, tests, format checks).
+ * Allows hooks to inspect staged files and potentially modify the commit.
+ */
+export const PreCommitInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.literal("PreCommit"),
+  cwd: z.string().optional(),
+  staged_files: z.array(z.string()).optional(),
+  branch: z.string().optional(),
+}).loose();
+export type PreCommitInput = z.infer<typeof PreCommitInputSchema>;
+
+/**
+ * Pre-push Git hook event schema.
+ * Triggered before git push to remote (branch protection, CI checks, etc).
+ * Allows hooks to validate branch state, verify CI status, or require review.
+ */
+const CommitSchema = z.object({
+  sha: z.string(),
+  message: z.string(),
+}).passthrough();
+
+export const PrePushInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.literal("PrePush"),
+  cwd: z.string().optional(),
+  branch: z.string().optional(),
+  remote: z.string().optional(),
+  commits: z.array(CommitSchema).optional(),
+}).loose();
+export type PrePushInput = z.infer<typeof PrePushInputSchema>;
+
+/**
+ * Loose variant of hook command output schema for cross-event validation.
+ * Accepts any additional fields from future versions without breaking parsing.
+ * Use when building unified output validators across multiple hook event types.
+ */
+export const HookCommandOutputSchemaLoose = z.object({
+  decision: z.enum(["allow", "deny", "block"]).optional(),
+  reason: z.string().optional(),
+  continue: z.boolean().optional(),
+  systemMessage: z.string().optional(),
+}).passthrough();
+export type HookCommandOutputLoose = z.infer<typeof HookCommandOutputSchemaLoose>;
+
+// ---------------------------------------------------------------------------
 // Practical helpers
 // ---------------------------------------------------------------------------
 
