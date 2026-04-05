@@ -8,8 +8,6 @@ import {
   type CodexHooksConfig,
 } from "./codex.ts";
 
-const CODEX_HOOK_EVENTS = CodexHookEventNameSchema.options;
-
 // ---------------------------------------------------------------------------
 // Config merge
 // ---------------------------------------------------------------------------
@@ -25,11 +23,14 @@ export function mergeCodexHooksFiles(
   | { ok: true; config: CodexHooksConfig }
   | { ok: false; index: number; error: z.ZodError } {
   const merged: CodexHooksConfig = {};
+  // Lazy evaluation: extract options inside function to avoid module-level initialization
+  // issues when bundler splits this into separate chunks
+  const codexHookEvents = CodexHookEventNameSchema.options;
   for (let i = 0; i < files.length; i++) {
     const parsed = CodexHooksFileSchema.safeParse(files[i]);
     if (!parsed.success) return { ok: false, index: i, error: parsed.error };
     const hooks = parsed.data.hooks;
-    for (const event of CODEX_HOOK_EVENTS) {
+    for (const event of codexHookEvents) {
       const groups = hooks[event];
       if (!groups?.length) continue;
       merged[event] = [...(merged[event] ?? []), ...groups];
