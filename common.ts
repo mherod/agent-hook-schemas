@@ -106,6 +106,31 @@ export const SharedHookSpecificOutputSchema = z.discriminatedUnion("hookEventNam
 ]);
 export type SharedHookSpecificOutput = z.infer<typeof SharedHookSpecificOutputSchema>;
 
+/**
+ * Factory for Codex command output schemas with decision field and hookSpecificOutput.
+ * Reduces duplication across PreToolUse, PostToolUse, and UserPromptSubmit outputs.
+ *
+ * @param decisionSchema - Zod schema for the `decision` field (e.g., CodexPreToolUseDecisionWireSchema)
+ * @param hookSpecificOutputSchema - Zod schema for the `hookSpecificOutput` field
+ * @returns Strict object schema with decision, hookSpecificOutput, reason, stopReason, suppressOutput, systemMessage, continue
+ */
+export function createCodexCommandOutputSchema<
+  D extends z.ZodTypeAny,
+  H extends z.ZodTypeAny,
+>(decisionSchema: D, hookSpecificOutputSchema: H) {
+  return z
+    .object({
+      continue: z.boolean().default(true),
+      decision: z.union([decisionSchema, z.null()]).default(null),
+      hookSpecificOutput: z.union([hookSpecificOutputSchema, z.null()]).default(null),
+      reason: z.union([z.string(), z.null()]).default(null),
+      stopReason: z.union([z.string(), z.null()]).default(null),
+      suppressOutput: z.boolean().default(false),
+      systemMessage: z.union([z.string(), z.null()]).default(null),
+    })
+    .strict();
+}
+
 /** @param hookEventName Must not be `PreToolUse` — use {@link SharedHookSpecificPreToolUseOutputSchema} instead. */
 export function sharedHookSpecificAdditionalContextSchema<
   const N extends SharedHookSpecificContextOnlyEventName,

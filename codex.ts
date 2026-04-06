@@ -6,6 +6,7 @@ import {
   OptionalStringField,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
+  createCodexCommandOutputSchema,
 } from "./common.ts";
 
 // ---------------------------------------------------------------------------
@@ -273,19 +274,10 @@ export type CodexPreToolUseHookSpecificOutputWire = z.infer<
  * OpenAI Codex JSON Schema `pre-tool-use.command.output`: strict top-level object
  * (`additionalProperties: false`).
  */
-export const CodexPreToolUseCommandOutputWireSchema = z
-  .object({
-    continue: z.boolean().default(true),
-    decision: z.union([CodexPreToolUseDecisionWireSchema, z.null()]).default(null),
-    hookSpecificOutput: z
-      .union([CodexPreToolUseHookSpecificOutputWireSchema, z.null()])
-      .default(null),
-    reason: z.union([z.string(), z.null()]).default(null),
-    stopReason: z.union([z.string(), z.null()]).default(null),
-    suppressOutput: z.boolean().default(false),
-    systemMessage: z.union([z.string(), z.null()]).default(null),
-  })
-  .strict();
+export const CodexPreToolUseCommandOutputWireSchema = createCodexCommandOutputSchema(
+  CodexPreToolUseDecisionWireSchema,
+  CodexPreToolUseHookSpecificOutputWireSchema,
+);
 export type CodexPreToolUseCommandOutputWire = z.infer<typeof CodexPreToolUseCommandOutputWireSchema>;
 
 export const CodexPreToolUseStdoutSchema = CodexPreToolUseCommandOutputWireSchema;
@@ -318,19 +310,10 @@ export type CodexPostToolUseHookSpecificOutputWire = z.infer<
  * OpenAI Codex JSON Schema `post-tool-use.command.output`: strict top-level object
  * (`additionalProperties: false`).
  */
-export const CodexPostToolUseCommandOutputWireSchema = z
-  .object({
-    continue: z.boolean().default(true),
-    decision: z.union([CodexBlockDecisionWireSchema, z.null()]).default(null),
-    hookSpecificOutput: z
-      .union([CodexPostToolUseHookSpecificOutputWireSchema, z.null()])
-      .default(null),
-    reason: z.union([z.string(), z.null()]).default(null),
-    stopReason: z.union([z.string(), z.null()]).default(null),
-    suppressOutput: z.boolean().default(false),
-    systemMessage: z.union([z.string(), z.null()]).default(null),
-  })
-  .strict();
+export const CodexPostToolUseCommandOutputWireSchema = createCodexCommandOutputSchema(
+  CodexBlockDecisionWireSchema,
+  CodexPostToolUseHookSpecificOutputWireSchema,
+);
 export type CodexPostToolUseCommandOutputWire = z.infer<
   typeof CodexPostToolUseCommandOutputWireSchema
 >;
@@ -372,19 +355,10 @@ export type CodexUserPromptSubmitHookSpecificOutputWire = CodexSessionStartHookS
  * OpenAI Codex JSON Schema `user-prompt-submit.command.output`: strict top-level object
  * (`additionalProperties: false`).
  */
-export const CodexUserPromptSubmitCommandOutputWireSchema = z
-  .object({
-    continue: z.boolean().default(true),
-    decision: z.union([CodexBlockDecisionWireSchema, z.null()]).default(null),
-    hookSpecificOutput: z
-      .union([CodexUserPromptSubmitHookSpecificOutputWireSchema, z.null()])
-      .default(null),
-    reason: z.union([z.string(), z.null()]).default(null),
-    stopReason: z.union([z.string(), z.null()]).default(null),
-    suppressOutput: z.boolean().default(false),
-    systemMessage: z.union([z.string(), z.null()]).default(null),
-  })
-  .strict();
+export const CodexUserPromptSubmitCommandOutputWireSchema = createCodexCommandOutputSchema(
+  CodexBlockDecisionWireSchema,
+  CodexUserPromptSubmitHookSpecificOutputWireSchema,
+);
 export type CodexUserPromptSubmitCommandOutputWire = z.infer<
   typeof CodexUserPromptSubmitCommandOutputWireSchema
 >;
