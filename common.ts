@@ -16,6 +16,14 @@ export type NullableStringDefault = z.infer<typeof NullableStringDefaultSchema>;
 export const OptionalStringField = z.string().optional();
 export type OptionalString = z.infer<typeof OptionalStringField>;
 
+/** Optional number field for repeated `z.number().optional()` pattern (token counts, durations, line numbers). */
+export const OptionalNumberField = z.number().optional();
+export type OptionalNumber = z.infer<typeof OptionalNumberField>;
+
+/** Optional boolean field for repeated `z.boolean().optional()` pattern (flags, toggles). */
+export const OptionalBooleanField = z.boolean().optional();
+export type OptionalBoolean = z.infer<typeof OptionalBooleanField>;
+
 /** Generic tool name field for platforms without specific tool name validation. */
 export const ToolNameSchema = z.string();
 export type ToolName = z.infer<typeof ToolNameSchema>;
@@ -185,10 +193,10 @@ export function sharedHookSpecificAdditionalContextSchema<
  * (`continue`, `stopReason`, `systemMessage`, `suppressOutput`).
  */
 export const SharedHookStdoutCommonFieldsSchema = z.object({
-  continue: z.boolean().optional(),
+  continue: OptionalBooleanField,
   stopReason: z.string().optional(),
   systemMessage: z.string().optional(),
-  suppressOutput: z.boolean().optional(),
+  suppressOutput: OptionalBooleanField,
 });
 export type SharedHookStdoutCommonFields = z.infer<typeof SharedHookStdoutCommonFieldsSchema>;
 
@@ -196,16 +204,16 @@ export const HookShellSchema = z.enum(["bash", "powershell"]);
 
 export const HookHandlerCommonSchema = z.object({
   if: z.string().optional(),
-  timeout: z.number().optional(),
+  timeout: OptionalNumberField,
   statusMessage: z.string().optional(),
-  once: z.boolean().optional(),
+  once: OptionalBooleanField,
 });
 
 /** Command hook handler shape shared by Claude and Codex `hooks.json`. */
 export const CommandHookHandlerSchema = HookHandlerCommonSchema.extend({
   type: z.literal("command"),
   command: z.string(),
-  async: z.boolean().optional(),
+  async: OptionalBooleanField,
   shell: HookShellSchema.optional(),
 });
 export type CommandHookHandler = z.infer<typeof CommandHookHandlerSchema>;

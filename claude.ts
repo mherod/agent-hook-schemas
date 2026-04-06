@@ -4,6 +4,7 @@ import {
   HookHandlerCommonSchema,
   HookShellSchema,
   JsonObjectSchema,
+  OptionalBooleanField,
   OptionalToolNameField,
   PreToolPermissionDecisionSchema,
   type SharedHookSpecificContextOnlyEventName,
@@ -306,7 +307,7 @@ export const PermissionRequestDecisionOutputSchema = z.object({
   updatedInput: JsonObjectSchema.optional(),
   updatedPermissions: z.array(PermissionUpdateEntrySchema).optional(),
   message: z.string().optional(),
-  interrupt: z.boolean().optional(),
+  interrupt: OptionalBooleanField,
 });
 export type PermissionRequestDecisionOutput = z.infer<typeof PermissionRequestDecisionOutputSchema>;
 
@@ -413,7 +414,7 @@ export const PostToolUseFailureInputSchema = HookInputBaseSchema.extend({
   .extend({
     tool_use_id: z.string().optional(),
     error: z.string().optional(),
-    is_interrupt: z.boolean().optional(),
+    is_interrupt: OptionalBooleanField,
   })
   .loose();
 export type PostToolUseFailureInput = z.infer<typeof PostToolUseFailureInputSchema>;
@@ -443,7 +444,7 @@ export const SubagentStartInputSchema = hookStdinLoose("SubagentStart", {
 export type SubagentStartInput = z.infer<typeof SubagentStartInputSchema>;
 
 export const SubagentStopInputSchema = hookStdinLoose("SubagentStop", {
-  stop_hook_active: z.boolean().optional(),
+  stop_hook_active: OptionalBooleanField,
   agent_id: z.string().optional(),
   agent_type: z.string().optional(),
   agent_transcript_path: z.string().optional(),
@@ -466,7 +467,7 @@ export const TaskCompletedInputSchema = HookInputBaseSchema.extend({
 export type TaskCompletedInput = z.infer<typeof TaskCompletedInputSchema>;
 
 export const StopInputSchema = hookStdinLoose("Stop", {
-  stop_hook_active: z.boolean().optional(),
+  stop_hook_active: OptionalBooleanField,
   last_assistant_message: z.string().optional(),
 });
 export type StopInput = z.infer<typeof StopInputSchema>;
@@ -648,7 +649,7 @@ export type HookSpecificPermissionRequestOutput = z.infer<
 
 export const HookSpecificPermissionDeniedOutputSchema = BaseHookSpecificOutputSchema.extend({
   hookEventName: z.literal("PermissionDenied"),
-  retry: z.boolean().optional(),
+  retry: OptionalBooleanField,
 });
 export type HookSpecificPermissionDeniedOutput = z.infer<
   typeof HookSpecificPermissionDeniedOutputSchema
@@ -719,9 +720,9 @@ export type HookSpecificOutput = z.infer<typeof HookSpecificOutputSchema>;
 /** Broad stdout JSON: combine universal fields + optional event payload + block decision. */
 export const HookCommandOutputSchema = z
   .object({
-    continue: z.boolean().optional(),
+    continue: OptionalBooleanField,
     stopReason: z.string().optional(),
-    suppressOutput: z.boolean().optional(),
+    suppressOutput: OptionalBooleanField,
     systemMessage: z.string().optional(),
     decision: z.literal("block").optional(),
     reason: z.string().optional(),
@@ -874,7 +875,7 @@ export const ClaudeSettingsSchema = z
   .object({
     // Hooks
     hooks: HooksConfigSchema.optional(),
-    disableAllHooks: z.boolean().optional(),
+    disableAllHooks: OptionalBooleanField,
 
     // Permissions
     permissions: SettingsPermissionsSchema.optional(),
@@ -898,8 +899,8 @@ export const ClaudeSettingsSchema = z
     // Misc
     effortLevel: z.string().optional(),
     autoUpdatesChannel: z.string().optional(),
-    voiceEnabled: z.boolean().optional(),
-    skipDangerousModePermissionPrompt: z.boolean().optional(),
+    voiceEnabled: OptionalBooleanField,
+    skipDangerousModePermissionPrompt: OptionalBooleanField,
   })
   .loose();
 export type ClaudeSettings = z.infer<typeof ClaudeSettingsSchema>;
@@ -913,7 +914,7 @@ export type ClaudeSettings = z.infer<typeof ClaudeSettingsSchema>;
 export const ClaudeSettingsFragmentSchema = z
   .object({
     hooks: HooksConfigSchema.optional(),
-    disableAllHooks: z.boolean().optional(),
+    disableAllHooks: OptionalBooleanField,
   })
   .loose();
 export type ClaudeSettingsFragment = z.infer<typeof ClaudeSettingsFragmentSchema>;
@@ -934,7 +935,7 @@ const PermissionRequestAllowDecisionSchema = z.object({
   updatedInput: JsonObjectSchema.optional(),
   updatedPermissions: z.array(PermissionUpdateEntrySchema).optional(),
   message: z.string().optional(),
-  interrupt: z.boolean().optional(),
+  interrupt: OptionalBooleanField,
 });
 
 const PermissionRequestStdoutWithDecisionSchema = <D extends z.ZodTypeAny>(decisionSchema: D) =>
@@ -1025,7 +1026,7 @@ export type PrePushInput = z.infer<typeof PrePushInputSchema>;
 export const HookCommandOutputSchemaLoose = z.object({
   decision: z.enum(["allow", "deny", "block"]).optional(),
   reason: z.string().optional(),
-  continue: z.boolean().optional(),
+  continue: OptionalBooleanField,
   systemMessage: z.string().optional(),
 }).passthrough();
 export type HookCommandOutputLoose = z.infer<typeof HookCommandOutputSchemaLoose>;

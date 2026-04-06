@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OptionalBooleanField, OptionalNumberField } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Task status enum
@@ -78,7 +79,7 @@ export const TaskUpdateToolResponseSuccessSchema = z
         to: TaskStatusSchema,
       })
       .optional(),
-    verificationNudgeNeeded: z.boolean().optional(),
+    verificationNudgeNeeded: OptionalBooleanField,
   })
   .loose();
 export type TaskUpdateToolResponseSuccess = z.infer<
@@ -169,8 +170,8 @@ export type TaskGetToolResponse = z.infer<typeof TaskGetToolResponseSchema>;
 export const TaskOutputToolInputSchema = z
   .object({
     task_id: z.string(),
-    block: z.boolean().optional(),
-    timeout: z.number().optional(),
+    block: OptionalBooleanField,
+    timeout: OptionalNumberField,
   })
   .loose();
 export type TaskOutputToolInput = z.infer<typeof TaskOutputToolInputSchema>;

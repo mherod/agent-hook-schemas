@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, OptionalStringField, OptionalToolNameField, SharedHookSpecificOutputSchema } from "./common.ts";
+import { JsonObjectSchema, OptionalBooleanField, OptionalNumberField, OptionalStringField, OptionalToolNameField, SharedHookSpecificOutputSchema } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Gemini CLI hooks — settings + stdin/stdout (see Gemini CLI hooks reference)
@@ -31,7 +31,7 @@ export const GeminiCommandHookHandlerSchema = z.object({
   type: z.literal("command"),
   command: z.string(),
   name: z.string().optional(),
-  timeout: z.number().optional(),
+  timeout: OptionalNumberField,
   description: z.string().optional(),
 });
 export type GeminiCommandHookHandler = z.infer<typeof GeminiCommandHookHandlerSchema>;
@@ -59,7 +59,7 @@ export function geminiMatcherPatternCompiles(matcher: string | undefined): boole
 export const GeminiMatcherGroupSchema = z
   .object({
     matcher: z.string().optional(),
-    sequential: z.boolean().optional(),
+    sequential: OptionalBooleanField,
     hooks: z.array(GeminiCommandHookHandlerSchema),
   })
   .superRefine((data, ctx) => {
@@ -149,7 +149,7 @@ export const GeminiAfterAgentInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("AfterAgent"),
   prompt: z.string().optional(),
   prompt_response: z.string().optional(),
-  stop_hook_active: z.boolean().optional(),
+  stop_hook_active: OptionalBooleanField,
 }).loose();
 export type GeminiAfterAgentInput = z.infer<typeof GeminiAfterAgentInputSchema>;
 
@@ -276,7 +276,7 @@ export const GeminiHookSpecificOutputExtensionSchema = z
         args: JsonObjectSchema,
       })
       .optional(),
-    clearContext: z.boolean().optional(),
+    clearContext: OptionalBooleanField,
   })
   .loose();
 
@@ -293,8 +293,8 @@ export type GeminiHookSpecificOutput = z.infer<typeof GeminiHookSpecificOutputSc
  */
 export const GeminiHookStdoutCommonFieldsSchema = z.object({
   systemMessage: z.string().optional(),
-  suppressOutput: z.boolean().optional(),
-  continue: z.boolean().optional(),
+  suppressOutput: OptionalBooleanField,
+  continue: OptionalBooleanField,
   stopReason: z.string().optional(),
   decision: GeminiHookStdoutDecisionSchema.optional(),
   reason: z.string().optional(),

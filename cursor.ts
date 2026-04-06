@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, NullableStringSchema, OptionalStringField, OptionalToolNameField } from "./common.ts";
+import { JsonObjectSchema, NullableStringSchema, OptionalBooleanField, OptionalNumberField, OptionalStringField, OptionalToolNameField } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Cursor Agent hooks — stdin JSON (Cursor `hooks.json` / Agent hooks)
@@ -70,10 +70,10 @@ export type CursorFileEdit = z.infer<typeof CursorFileEditSchema>;
 /** Character range on a `afterTabFileEdit` edit entry. */
 export const CursorTabFileEditRangeSchema = z
   .object({
-    start_line_number: z.number().optional(),
-    start_column: z.number().optional(),
-    end_line_number: z.number().optional(),
-    end_column: z.number().optional(),
+    start_line_number: OptionalNumberField,
+    start_column: OptionalNumberField,
+    end_line_number: OptionalNumberField,
+    end_column: OptionalNumberField,
   })
   .loose();
 export type CursorTabFileEditRange = z.infer<typeof CursorTabFileEditRangeSchema>;
@@ -98,10 +98,10 @@ export type CursorTabFileEdit = z.infer<typeof CursorTabFileEditSchema>;
 export const CursorAfterAgentResponseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("afterAgentResponse"),
   text: z.string().optional(),
-  input_tokens: z.number().optional(),
-  output_tokens: z.number().optional(),
-  cache_read_tokens: z.number().optional(),
-  cache_write_tokens: z.number().optional(),
+  input_tokens: OptionalNumberField,
+  output_tokens: OptionalNumberField,
+  cache_read_tokens: OptionalNumberField,
+  cache_write_tokens: OptionalNumberField,
 }).loose();
 export type CursorAfterAgentResponseHookInput = z.infer<
   typeof CursorAfterAgentResponseHookInputSchema
@@ -111,7 +111,7 @@ export type CursorAfterAgentResponseHookInput = z.infer<
 export const CursorAfterAgentThoughtHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("afterAgentThought"),
   text: z.string().optional(),
-  duration_ms: z.number().optional(),
+  duration_ms: OptionalNumberField,
 }).loose();
 export type CursorAfterAgentThoughtHookInput = z.infer<
   typeof CursorAfterAgentThoughtHookInputSchema
@@ -131,7 +131,7 @@ export const CursorAfterMCPExecutionHookInputSchema = CursorHookInputBaseSchema.
   tool_name: OptionalToolNameField,
   tool_input: z.string().optional(),
   result_json: z.string().optional(),
-  duration: z.number().optional(),
+  duration: OptionalNumberField,
 }).loose();
 export type CursorAfterMCPExecutionHookInput = z.infer<
   typeof CursorAfterMCPExecutionHookInputSchema
@@ -142,8 +142,8 @@ export const CursorAfterShellExecutionHookInputSchema = CursorHookInputBaseSchem
   hook_event_name: z.literal("afterShellExecution"),
   command: z.string().optional(),
   output: z.string().optional(),
-  duration: z.number().optional(),
-  sandbox: z.boolean().optional(),
+  duration: OptionalNumberField,
+  sandbox: OptionalBooleanField,
 }).loose();
 export type CursorAfterShellExecutionHookInput = z.infer<
   typeof CursorAfterShellExecutionHookInputSchema
@@ -186,7 +186,7 @@ export const CursorBeforeShellExecutionHookInputSchema = CursorHookInputBaseSche
   hook_event_name: z.literal("beforeShellExecution"),
   command: z.string().optional(),
   cwd: z.string().optional(),
-  sandbox: z.boolean().optional(),
+  sandbox: OptionalBooleanField,
 }).loose();
 export type CursorBeforeShellExecutionHookInput = z.infer<
   typeof CursorBeforeShellExecutionHookInputSchema
@@ -219,7 +219,7 @@ export const CursorPostToolUseHookInputSchema = CursorHookInputBaseSchema.extend
   tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   tool_output: z.union([z.string(), JsonObjectSchema]).optional(),
-  duration: z.number().optional(),
+  duration: OptionalNumberField,
   tool_use_id: z.string().optional(),
   cwd: z.string().optional(),
 }).loose();
@@ -234,8 +234,8 @@ export const CursorPostToolUseFailureHookInputSchema = CursorHookInputBaseSchema
   cwd: z.string().optional(),
   error_message: z.string().optional(),
   failure_type: z.enum(["error", "timeout", "permission_denied"]).or(z.string()).optional(),
-  duration: z.number().optional(),
-  is_interrupt: z.boolean().optional(),
+  duration: OptionalNumberField,
+  is_interrupt: OptionalBooleanField,
 }).loose();
 export type CursorPostToolUseFailureHookInput = z.infer<
   typeof CursorPostToolUseFailureHookInputSchema
@@ -245,12 +245,12 @@ export type CursorPostToolUseFailureHookInput = z.infer<
 export const CursorPreCompactHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("preCompact"),
   trigger: z.string().optional(),
-  context_usage_percent: z.number().optional(),
-  context_tokens: z.number().optional(),
-  context_window_size: z.number().optional(),
-  message_count: z.number().optional(),
-  messages_to_compact: z.number().optional(),
-  is_first_compaction: z.boolean().optional(),
+  context_usage_percent: OptionalNumberField,
+  context_tokens: OptionalNumberField,
+  context_window_size: OptionalNumberField,
+  message_count: OptionalNumberField,
+  messages_to_compact: OptionalNumberField,
+  is_first_compaction: OptionalBooleanField,
 }).loose();
 export type CursorPreCompactHookInput = z.infer<typeof CursorPreCompactHookInputSchema>;
 
@@ -269,8 +269,8 @@ export type CursorPreToolUseHookInput = z.infer<typeof CursorPreToolUseHookInput
 export const CursorSessionEndHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("sessionEnd"),
   reason: z.string().optional(),
-  duration_ms: z.number().optional(),
-  is_background_agent: z.boolean().optional(),
+  duration_ms: OptionalNumberField,
+  is_background_agent: OptionalBooleanField,
   final_status: z.string().optional(),
   error_message: z.string().optional(),
 }).loose();
@@ -279,7 +279,7 @@ export type CursorSessionEndHookInput = z.infer<typeof CursorSessionEndHookInput
 /** `hook_event_name: "sessionStart"` — new agent session. */
 export const CursorSessionStartHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("sessionStart"),
-  is_background_agent: z.boolean().optional(),
+  is_background_agent: OptionalBooleanField,
   composer_mode: z.string().optional(),
 }).loose();
 export type CursorSessionStartHookInput = z.infer<typeof CursorSessionStartHookInputSchema>;
@@ -288,11 +288,11 @@ export type CursorSessionStartHookInput = z.infer<typeof CursorSessionStartHookI
 export const CursorStopHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("stop"),
   status: z.string().optional(),
-  loop_count: z.number().optional(),
-  input_tokens: z.number().optional(),
-  output_tokens: z.number().optional(),
-  cache_read_tokens: z.number().optional(),
-  cache_write_tokens: z.number().optional(),
+  loop_count: OptionalNumberField,
+  input_tokens: OptionalNumberField,
+  output_tokens: OptionalNumberField,
+  cache_read_tokens: OptionalNumberField,
+  cache_write_tokens: OptionalNumberField,
 }).loose();
 export type CursorStopHookInput = z.infer<typeof CursorStopHookInputSchema>;
 
@@ -305,7 +305,7 @@ export const CursorSubagentStartHookInputSchema = CursorHookInputBaseSchema.exte
   parent_conversation_id: z.string().optional(),
   tool_call_id: z.string().optional(),
   subagent_model: z.string().optional(),
-  is_parallel_worker: z.boolean().optional(),
+  is_parallel_worker: OptionalBooleanField,
   git_branch: z.string().optional(),
 }).loose();
 export type CursorSubagentStartHookInput = z.infer<typeof CursorSubagentStartHookInputSchema>;
@@ -318,10 +318,10 @@ export const CursorSubagentStopHookInputSchema = CursorHookInputBaseSchema.exten
   task: z.string().optional(),
   description: z.string().optional(),
   summary: z.string().optional(),
-  duration_ms: z.number().optional(),
-  message_count: z.number().optional(),
-  tool_call_count: z.number().optional(),
-  loop_count: z.number().optional(),
+  duration_ms: OptionalNumberField,
+  message_count: OptionalNumberField,
+  tool_call_count: OptionalNumberField,
+  loop_count: OptionalNumberField,
   modified_files: z.array(z.string()).optional(),
   agent_transcript_path: NullableStringSchema.optional(),
 }).loose();

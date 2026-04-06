@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema } from "./common.ts";
+import { JsonObjectSchema, OptionalBooleanField, OptionalNumberField } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Tool inputs (PreToolUse / PermissionRequest / PostToolUse*)
@@ -8,8 +8,8 @@ import { JsonObjectSchema } from "./common.ts";
 export const BashToolInputSchema = z.object({
   command: z.string(),
   description: z.string().optional(),
-  timeout: z.number().optional(),
-  run_in_background: z.boolean().optional(),
+  timeout: OptionalNumberField,
+  run_in_background: OptionalBooleanField,
 });
 export type BashToolInput = z.infer<typeof BashToolInputSchema>;
 
@@ -18,9 +18,9 @@ export const BashToolResponseSchema = z
   .object({
     stdout: z.string(),
     stderr: z.string(),
-    interrupted: z.boolean().optional(),
-    isImage: z.boolean().optional(),
-    noOutputExpected: z.boolean().optional(),
+    interrupted: OptionalBooleanField,
+    isImage: OptionalBooleanField,
+    noOutputExpected: OptionalBooleanField,
   })
   .loose();
 export type BashToolResponse = z.infer<typeof BashToolResponseSchema>;
@@ -35,7 +35,7 @@ export const EditToolInputSchema = z.object({
   file_path: z.string(),
   old_string: z.string(),
   new_string: z.string(),
-  replace_all: z.boolean().optional(),
+  replace_all: OptionalBooleanField,
 });
 export type EditToolInput = z.infer<typeof EditToolInputSchema>;
 
@@ -51,8 +51,8 @@ export type EditToolResponse = z.infer<typeof EditToolResponseSchema>;
 
 export const ReadToolInputSchema = z.object({
   file_path: z.string(),
-  offset: z.number().optional(),
-  limit: z.number().optional(),
+  offset: OptionalNumberField,
+  limit: OptionalNumberField,
 });
 export type ReadToolInput = z.infer<typeof ReadToolInputSchema>;
 
@@ -64,9 +64,9 @@ export const ReadToolResponseTextSchema = z
       .object({
         filePath: z.string(),
         content: z.string(),
-        numLines: z.number().optional(),
-        startLine: z.number().optional(),
-        totalLines: z.number().optional(),
+        numLines: OptionalNumberField,
+        startLine: OptionalNumberField,
+        totalLines: OptionalNumberField,
       })
       .loose(),
   })
@@ -100,8 +100,8 @@ export const GrepToolInputSchema = z.object({
   path: z.string().optional(),
   glob: z.string().optional(),
   output_mode: z.enum(["content", "files_with_matches", "count"]).optional(),
-  "-i": z.boolean().optional(),
-  multiline: z.boolean().optional(),
+  "-i": OptionalBooleanField,
+  multiline: OptionalBooleanField,
 });
 export type GrepToolInput = z.infer<typeof GrepToolInputSchema>;
 
@@ -109,10 +109,10 @@ export type GrepToolInput = z.infer<typeof GrepToolInputSchema>;
 export const GrepToolResponseSchema = z
   .object({
     mode: z.string().optional(),
-    numFiles: z.number().optional(),
+    numFiles: OptionalNumberField,
     filenames: z.array(z.string()).optional(),
     content: z.string().optional(),
-    numLines: z.number().optional(),
+    numLines: OptionalNumberField,
   })
   .loose();
 export type GrepToolResponse = z.infer<typeof GrepToolResponseSchema>;
@@ -159,7 +159,7 @@ export const WebSearchToolResponseSchema = z
   .object({
     query: z.string(),
     results: z.array(z.union([WebSearchResultBlockSchema, z.string()])),
-    durationSeconds: z.number().optional(),
+    durationSeconds: OptionalNumberField,
   })
   .loose();
 export type WebSearchToolResponse = z.infer<typeof WebSearchToolResponseSchema>;
@@ -172,7 +172,7 @@ export type WebSearchToolResponse = z.infer<typeof WebSearchToolResponseSchema>;
 export const ToolSearchToolInputSchema = z
   .object({
     query: z.string(),
-    max_results: z.number().optional(),
+    max_results: OptionalNumberField,
   })
   .loose();
 export type ToolSearchToolInput = z.infer<typeof ToolSearchToolInputSchema>;
@@ -182,7 +182,7 @@ export const ToolSearchToolResponseSchema = z
   .object({
     matches: z.array(z.string()),
     query: z.string(),
-    total_deferred_tools: z.number().optional(),
+    total_deferred_tools: OptionalNumberField,
   })
   .loose();
 export type ToolSearchToolResponse = z.infer<typeof ToolSearchToolResponseSchema>;
@@ -204,7 +204,7 @@ export const AskUserQuestionItemSchema = z.object({
   question: z.string(),
   header: z.string(),
   options: z.array(AskUserQuestionOptionSchema),
-  multiSelect: z.boolean().optional(),
+  multiSelect: OptionalBooleanField,
 });
 export type AskUserQuestionItem = z.infer<typeof AskUserQuestionItemSchema>;
 

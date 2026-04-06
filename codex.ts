@@ -4,6 +4,8 @@ import {
   JsonObjectSchema,
   NullableStringSchema,
   NullableStringDefaultSchema,
+  OptionalBooleanField,
+  OptionalNumberField,
   OptionalStringField,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
@@ -166,7 +168,7 @@ export const CodexStopInputSchema = z
     model: z.string().optional(),
     permission_mode: CodexHookPermissionModeSchema.optional(),
     session_id: z.string().optional(),
-    stop_hook_active: z.boolean().optional(),
+    stop_hook_active: OptionalBooleanField,
     transcript_path: CodexNullableStringSchema.optional(),
     turn_id: z.string().optional(),
   })
@@ -188,7 +190,7 @@ export type CodexHookEventInput = z.infer<typeof CodexHookEventInputSchema>;
  * plus `timeoutSec` alias.
  */
 export const CodexCommandHookHandlerSchema = CommandHookHandlerSchema.extend({
-  timeoutSec: z.number().optional(),
+  timeoutSec: OptionalNumberField,
 });
 export type CodexCommandHookHandler = z.infer<typeof CodexCommandHookHandlerSchema>;
 
