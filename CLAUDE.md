@@ -28,7 +28,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
 - `gemini.ts` — Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput()`
 - `gemini-hooks-integration.ts` — `mergeGeminiHooksFiles()`, `resolveMatchingGeminiHandlers()`
-- `cursor.ts` — Cursor agent hooks stdin schemas (camelCase events), `ParseCursorHookInput()`
+- `cursor.ts` — Cursor agent + Tab hooks stdin schemas (20 events, camelCase), helper schemas for edits/ranges, `ParseCursorHookInput()`
 - `common.ts` — Shared shapes where Claude and Codex overlap (not re-exported from root barrel)
 - `index.ts` — Root barrel re-exporting all modules
 

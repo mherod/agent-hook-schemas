@@ -174,7 +174,7 @@ const codexResult = CodexHooksFileSchema.safeParse(hooksJson);
 
 | | Claude Code | Codex | Gemini CLI | Cursor |
 |---|---|---|---|---|
-| **Events** | 26 events | 5 events | 11 events | 10 events |
+| **Events** | 26 events | 5 events | 11 events | 20 events |
 | **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`) |
 | **Handler types** | command, http, prompt, agent | command only | command only | N/A (stdin-only) |
 | **Matcher** | Regex on subject | Regex on subject | Regex (tool) / exact (lifecycle) | N/A |
