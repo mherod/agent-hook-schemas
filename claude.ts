@@ -4,6 +4,7 @@ import {
   HookHandlerCommonSchema,
   HookShellSchema,
   JsonObjectSchema,
+  OptionalToolNameField,
   PreToolPermissionDecisionSchema,
   type SharedHookSpecificContextOnlyEventName,
   SharedHookEventNameSchema,
@@ -1188,7 +1189,7 @@ export type HookInputBasePartial = z.infer<typeof HookInputBaseSchemaPartial>;
  * Enables downstream consumers to build uniform parsers for tool-related events.
  */
 export const ToolHookInputBaseSchema = HookInputBaseSchema.extend({
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_use_id: z.string().optional(),
   tool_input: z.record(z.string(), z.unknown()).optional(),
 }).loose();

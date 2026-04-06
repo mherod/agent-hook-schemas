@@ -3,6 +3,7 @@ import {
   CommandHookHandlerSchema,
   JsonObjectSchema,
   NullableStringSchema,
+  NullableStringDefaultSchema,
   OptionalStringField,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
@@ -259,11 +260,11 @@ export type CodexPreToolUseDecisionWire = z.infer<typeof CodexPreToolUseDecision
 export const CodexPreToolUseHookSpecificOutputWireSchema = z
   .object({
     hookEventName: CodexHookEventNameWireSchema,
-    additionalContext: z.union([z.string(), z.null()]).default(null),
+    additionalContext: NullableStringDefaultSchema,
     permissionDecision: z
       .union([CodexPreToolUsePermissionDecisionWireSchema, z.null()])
       .default(null),
-    permissionDecisionReason: z.union([z.string(), z.null()]).default(null),
+    permissionDecisionReason: NullableStringDefaultSchema,
     updatedInput: z.union([JsonObjectSchema, z.null()]).default(null),
   })
   .strict();
@@ -299,7 +300,7 @@ export type CodexBlockDecisionWire = z.infer<typeof CodexBlockDecisionWireSchema
 export const CodexPostToolUseHookSpecificOutputWireSchema = z
   .object({
     hookEventName: CodexHookEventNameWireSchema,
-    additionalContext: z.union([z.string(), z.null()]).default(null),
+    additionalContext: NullableStringDefaultSchema,
     updatedMCPToolOutput: z.union([JsonObjectSchema, z.null()]).default(null),
   })
   .strict();
@@ -333,7 +334,7 @@ export type CodexPostToolUseHookSpecificStdout = CodexPostToolUseHookSpecificOut
 export const CodexSessionStartHookSpecificOutputWireSchema = z
   .object({
     hookEventName: CodexHookEventNameWireSchema,
-    additionalContext: z.union([z.string(), z.null()]).default(null),
+    additionalContext: NullableStringDefaultSchema,
   })
   .strict();
 export type CodexSessionStartHookSpecificOutputWire = z.infer<
@@ -382,9 +383,9 @@ export const CodexSessionStartCommandOutputWireSchema = z
     hookSpecificOutput: z
       .union([CodexSessionStartHookSpecificOutputWireSchema, z.null()])
       .default(null),
-    stopReason: z.union([z.string(), z.null()]).default(null),
+    stopReason: NullableStringDefaultSchema,
     suppressOutput: z.boolean().default(false),
-    systemMessage: z.union([z.string(), z.null()]).default(null),
+    systemMessage: NullableStringDefaultSchema,
   })
   .strict();
 export type CodexSessionStartCommandOutputWire = z.infer<
@@ -403,10 +404,10 @@ export const CodexStopCommandOutputWireSchema = z
   .object({
     continue: z.boolean().default(true),
     decision: z.union([CodexBlockDecisionWireSchema, z.null()]).default(null),
-    reason: z.union([z.string(), z.null()]).default(null),
-    stopReason: z.union([z.string(), z.null()]).default(null),
+    reason: NullableStringDefaultSchema,
+    stopReason: NullableStringDefaultSchema,
     suppressOutput: z.boolean().default(false),
-    systemMessage: z.union([z.string(), z.null()]).default(null),
+    systemMessage: NullableStringDefaultSchema,
   })
   .strict();
 export type CodexStopCommandOutputWire = z.infer<typeof CodexStopCommandOutputWireSchema>;

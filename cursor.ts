@@ -323,7 +323,7 @@ export const CursorSubagentStopHookInputSchema = CursorHookInputBaseSchema.exten
   tool_call_count: z.number().optional(),
   loop_count: z.number().optional(),
   modified_files: z.array(z.string()).optional(),
-  agent_transcript_path: z.union([z.string(), z.null()]).optional(),
+  agent_transcript_path: NullableStringSchema.optional(),
 }).loose();
 export type CursorSubagentStopHookInput = z.infer<typeof CursorSubagentStopHookInputSchema>;
 

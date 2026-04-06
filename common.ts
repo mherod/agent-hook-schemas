@@ -8,6 +8,10 @@ export type JsonObject = z.infer<typeof JsonObjectSchema>;
 export const NullableStringSchema = z.union([z.string(), z.null()]);
 export type NullableString = z.infer<typeof NullableStringSchema>;
 
+/** Nullable string with null default — `z.union([z.string(), z.null()]).default(null)` for Codex wire output fields. */
+export const NullableStringDefaultSchema = z.union([z.string(), z.null()]).default(null);
+export type NullableStringDefault = z.infer<typeof NullableStringDefaultSchema>;
+
 /** Optional string field for repeated `z.string().optional()` pattern in hook input schemas. */
 export const OptionalStringField = z.string().optional();
 export type OptionalString = z.infer<typeof OptionalStringField>;
@@ -131,10 +135,10 @@ export function createCodexCommandOutputSchema<
       continue: z.boolean().default(true),
       decision: z.union([decisionSchema, z.null()]).default(null),
       hookSpecificOutput: z.union([hookSpecificOutputSchema, z.null()]).default(null),
-      reason: z.union([z.string(), z.null()]).default(null),
-      stopReason: z.union([z.string(), z.null()]).default(null),
+      reason: NullableStringDefaultSchema,
+      stopReason: NullableStringDefaultSchema,
       suppressOutput: z.boolean().default(false),
-      systemMessage: z.union([z.string(), z.null()]).default(null),
+      systemMessage: NullableStringDefaultSchema,
     })
     .strict();
 }
