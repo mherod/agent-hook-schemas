@@ -24,6 +24,23 @@ export type ToolName = z.infer<typeof ToolNameSchema>;
 export const OptionalToolNameField = z.string().optional();
 export type OptionalToolName = z.infer<typeof OptionalToolNameField>;
 
+/**
+ * Claude Code permission decision values for PreToolUse hooks.
+ *
+ * - `"allow"` — permit the tool call without prompting the user
+ * - `"deny"` — block the tool call; the agent receives the denial reason
+ * - `"ask"` — defer to the user for interactive approval (default CLI behavior)
+ * - `"defer"` — let downstream hooks or the default policy decide (Claude-only;
+ *   enables background/headless agent workflows where interactive prompts are impossible)
+ *
+ * **Why 4 values (vs. Codex 3, Gemini 3):** Claude's `defer` supports headless agent
+ * sessions (e.g. background tasks, CI pipelines) where no human is available to respond
+ * to `ask`. Codex omits `defer` because its CLI always has an interactive session.
+ * Gemini omits `ask` entirely, using `block` instead of `deny` for a simpler model.
+ *
+ * @see CodexPreToolUsePermissionDecisionWireSchema — Codex equivalent (no `defer`)
+ * @see GeminiHookStdoutDecisionSchema — Gemini equivalent (no `ask` or `defer`)
+ */
 export const PreToolPermissionDecisionSchema = z.enum(["allow", "deny", "ask", "defer"]);
 export type PreToolPermissionDecision = z.infer<typeof PreToolPermissionDecisionSchema>;
 

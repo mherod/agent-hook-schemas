@@ -243,7 +243,22 @@ export const CodexHookEventNameWireSchema = z.enum([
 ]);
 export type CodexHookEventNameWire = z.infer<typeof CodexHookEventNameWireSchema>;
 
-/** `PreToolUsePermissionDecisionWire` on `pre-tool-use.command.output` (no `defer`). */
+/**
+ * Codex permission decision values for PreToolUse `hookSpecificOutput`.
+ *
+ * - `"allow"` — permit the tool call
+ * - `"deny"` — block the tool call
+ * - `"ask"` — prompt the user for approval
+ *
+ * **Why 3 values (vs. Claude 4):** Codex omits `defer` because the Codex CLI always
+ * runs in an interactive terminal session — there is no headless/background mode where
+ * `defer` would be needed. Permission decisions are also separated from blocking
+ * decisions: PreToolUse uses this enum, while PostToolUse/UserPromptSubmit use
+ * {@link CodexBlockDecisionWireSchema} (`"block"` only).
+ *
+ * @see PreToolPermissionDecisionSchema — Claude equivalent (adds `defer`)
+ * @see GeminiHookStdoutDecisionSchema — Gemini equivalent (replaces `ask` with `block`)
+ */
 export const CodexPreToolUsePermissionDecisionWireSchema = z.enum(["allow", "deny", "ask"]);
 export type CodexPreToolUsePermissionDecisionWire = z.infer<
   typeof CodexPreToolUsePermissionDecisionWireSchema

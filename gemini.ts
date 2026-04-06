@@ -235,7 +235,22 @@ export type GeminiHookEventInput = z.infer<typeof GeminiHookEventInputSchema>;
 
 // --- stdout (common + hookSpecificOutput bag) --------------------------------
 
-/** Documented `decision` values; `"block"` is an alias of deny-style blocking. */
+/**
+ * Gemini CLI decision values for hook stdout.
+ *
+ * - `"allow"` — permit the action
+ * - `"deny"` — reject the action (soft denial, agent may retry)
+ * - `"block"` — hard block, terminates the action path
+ *
+ * **Why 3 values (vs. Claude 4, Codex 3):** Gemini uses a single `decision` field
+ * across all hook types (no separate permission vs. block enums like Codex). It omits
+ * `ask` because Gemini hooks do not support interactive user prompts — decisions must
+ * be fully automated. It omits `defer` because there is no background agent mode.
+ * The `block` value replaces Codex's separate {@link CodexBlockDecisionWireSchema}.
+ *
+ * @see PreToolPermissionDecisionSchema — Claude equivalent (adds `ask` and `defer`)
+ * @see CodexPreToolUsePermissionDecisionWireSchema — Codex equivalent (uses `ask`, no `block`)
+ */
 export const GeminiHookStdoutDecisionSchema = z.enum(["allow", "deny", "block"]);
 export type GeminiHookStdoutDecision = z.infer<typeof GeminiHookStdoutDecisionSchema>;
 
