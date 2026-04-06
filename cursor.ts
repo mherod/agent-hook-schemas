@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema } from "./common.ts";
+import { JsonObjectSchema, NullableStringSchema } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Cursor Agent hooks — stdin JSON (Cursor `hooks.json` / Agent hooks)
@@ -43,7 +43,7 @@ export const CursorHookInputBaseSchema = z.object({
   cursor_version: z.string().optional(),
   workspace_roots: z.array(z.string()).optional(),
   user_email: z.string().optional(),
-  transcript_path: z.union([z.string(), z.null()]).optional(),
+  transcript_path: NullableStringSchema.optional(),
 });
 export type CursorHookInputBase = z.infer<typeof CursorHookInputBaseSchema>;
 

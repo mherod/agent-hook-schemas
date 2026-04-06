@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CommandHookHandlerSchema,
   JsonObjectSchema,
+  NullableStringSchema,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
 } from "./common.ts";
@@ -24,10 +25,10 @@ export type CodexHookEventName = z.infer<typeof CodexHookEventNameSchema>;
 export const CodexSessionStartSourceSchema = z.enum(["startup", "resume", "clear"]);
 export type CodexSessionStartSource = z.infer<typeof CodexSessionStartSourceSchema>;
 
-/** `string | null` fields on Codex hook stdin (e.g. `transcript_path`, `last_assistant_message`). */
-export const CodexNullableStringSchema = z.union([z.string(), z.null()]);
+/** Alias for {@link NullableStringSchema} for backward compatibility. */
+export const CodexNullableStringSchema = NullableStringSchema;
 
-const CodexTranscriptPathSchema = CodexNullableStringSchema;
+const CodexTranscriptPathSchema = NullableStringSchema;
 
 /** Shared Codex stdin fields (see Codex hooks "Common input fields"). All fields optional for resilient parsing. */
 export const CodexHookInputBaseSchema = z.object({

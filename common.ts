@@ -4,6 +4,10 @@ import { z } from "zod";
 export const JsonObjectSchema = z.record(z.string(), z.unknown());
 export type JsonObject = z.infer<typeof JsonObjectSchema>;
 
+/** Nullable string (`string | null`) for fields like transcript_path, last_assistant_message. */
+export const NullableStringSchema = z.union([z.string(), z.null()]);
+export type NullableString = z.infer<typeof NullableStringSchema>;
+
 export const PreToolPermissionDecisionSchema = z.enum(["allow", "deny", "ask", "defer"]);
 export type PreToolPermissionDecision = z.infer<typeof PreToolPermissionDecisionSchema>;
 
