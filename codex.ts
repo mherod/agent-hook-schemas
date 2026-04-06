@@ -4,10 +4,10 @@ import {
   JsonObjectSchema,
   NullableStringSchema,
   OptionalStringField,
-  OptionalToolNameField,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
   createCodexCommandOutputSchema,
+  OptionalToolNameField,
 } from "./common.ts";
 
 // ---------------------------------------------------------------------------

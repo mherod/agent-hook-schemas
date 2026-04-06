@@ -38,7 +38,7 @@ export type SharedHookEventName = z.infer<typeof SharedHookEventNameSchema>;
 
 /** Shared `tool_name` + `tool_input` on tool-shaped hook stdin (Claude + Codex). */
 export const ToolCallCoreSchema = z.object({
-  tool_name: z.string(),
+  tool_name: ToolNameSchema,
   tool_input: JsonObjectSchema,
 });
 export type ToolCallCore = z.infer<typeof ToolCallCoreSchema>;
