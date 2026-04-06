@@ -30,9 +30,9 @@ export type GeminiHookEventName = z.infer<typeof GeminiHookEventNameSchema>;
 export const GeminiCommandHookHandlerSchema = z.object({
   type: z.literal("command"),
   command: z.string(),
-  name: z.string().optional(),
+  name: OptionalStringField,
   timeout: OptionalNumberField,
-  description: z.string().optional(),
+  description: OptionalStringField,
 });
 export type GeminiCommandHookHandler = z.infer<typeof GeminiCommandHookHandlerSchema>;
 
@@ -58,7 +58,7 @@ export function geminiMatcherPatternCompiles(matcher: string | undefined): boole
  */
 export const GeminiMatcherGroupSchema = z
   .object({
-    matcher: z.string().optional(),
+    matcher: OptionalStringField,
     sequential: OptionalBooleanField,
     hooks: z.array(GeminiCommandHookHandlerSchema),
   })
@@ -141,14 +141,14 @@ export type GeminiSessionEndInput = z.infer<typeof GeminiSessionEndInputSchema>;
 
 export const GeminiBeforeAgentInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("BeforeAgent"),
-  prompt: z.string().optional(),
+  prompt: OptionalStringField,
 }).loose();
 export type GeminiBeforeAgentInput = z.infer<typeof GeminiBeforeAgentInputSchema>;
 
 export const GeminiAfterAgentInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("AfterAgent"),
-  prompt: z.string().optional(),
-  prompt_response: z.string().optional(),
+  prompt: OptionalStringField,
+  prompt_response: OptionalStringField,
   stop_hook_active: OptionalBooleanField,
 }).loose();
 export type GeminiAfterAgentInput = z.infer<typeof GeminiAfterAgentInputSchema>;
@@ -177,7 +177,7 @@ export const GeminiBeforeToolInputSchema = GeminiHookInputBaseSchema.extend({
   tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   mcp_context: JsonObjectSchema.optional(),
-  original_request_name: z.string().optional(),
+  original_request_name: OptionalStringField,
 }).loose();
 export type GeminiBeforeToolInput = z.infer<typeof GeminiBeforeToolInputSchema>;
 
@@ -187,7 +187,7 @@ export const GeminiAfterToolInputSchema = GeminiHookInputBaseSchema.extend({
   tool_input: JsonObjectSchema.optional(),
   tool_response: JsonObjectSchema.optional(),
   mcp_context: JsonObjectSchema.optional(),
-  original_request_name: z.string().optional(),
+  original_request_name: OptionalStringField,
 }).loose();
 export type GeminiAfterToolInput = z.infer<typeof GeminiAfterToolInputSchema>;
 
@@ -199,8 +199,8 @@ export type GeminiPreCompressInput = z.infer<typeof GeminiPreCompressInputSchema
 
 export const GeminiNotificationInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("Notification"),
-  notification_type: z.string().optional(),
-  message: z.string().optional(),
+  notification_type: OptionalStringField,
+  message: OptionalStringField,
   details: JsonObjectSchema.optional(),
 }).loose();
 export type GeminiNotificationInput = z.infer<typeof GeminiNotificationInputSchema>;
@@ -261,7 +261,7 @@ export type GeminiHookStdoutDecision = z.infer<typeof GeminiHookStdoutDecisionSc
 export const GeminiHookSpecificOutputExtensionSchema = z
   .object({
     tool_input: JsonObjectSchema.optional(),
-    additionalContext: z.string().optional(),
+    additionalContext: OptionalStringField,
     llm_request: JsonObjectSchema.optional(),
     llm_response: JsonObjectSchema.optional(),
     toolConfig: z
@@ -292,12 +292,12 @@ export type GeminiHookSpecificOutput = z.infer<typeof GeminiHookSpecificOutputSc
  * Use `.loose()` at call sites if you need extra keys.
  */
 export const GeminiHookStdoutCommonFieldsSchema = z.object({
-  systemMessage: z.string().optional(),
+  systemMessage: OptionalStringField,
   suppressOutput: OptionalBooleanField,
   continue: OptionalBooleanField,
-  stopReason: z.string().optional(),
+  stopReason: OptionalStringField,
   decision: GeminiHookStdoutDecisionSchema.optional(),
-  reason: z.string().optional(),
+  reason: OptionalStringField,
   hookSpecificOutput: GeminiHookSpecificOutputSchema.optional(),
 });
 export type GeminiHookStdoutCommonFields = z.infer<typeof GeminiHookStdoutCommonFieldsSchema>;
