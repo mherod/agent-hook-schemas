@@ -12,6 +12,14 @@ export type NullableString = z.infer<typeof NullableStringSchema>;
 export const OptionalStringField = z.string().optional();
 export type OptionalString = z.infer<typeof OptionalStringField>;
 
+/** Generic tool name field for platforms without specific tool name validation. */
+export const ToolNameSchema = z.string();
+export type ToolName = z.infer<typeof ToolNameSchema>;
+
+/** Optional tool name field for repeated `tool_name: z.string().optional()` pattern. */
+export const OptionalToolNameField = z.string().optional();
+export type OptionalToolName = z.infer<typeof OptionalToolNameField>;
+
 export const PreToolPermissionDecisionSchema = z.enum(["allow", "deny", "ask", "defer"]);
 export type PreToolPermissionDecision = z.infer<typeof PreToolPermissionDecisionSchema>;
 

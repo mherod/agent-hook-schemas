@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, NullableStringSchema, OptionalStringField } from "./common.ts";
+import { JsonObjectSchema, NullableStringSchema, OptionalStringField, OptionalToolNameField } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Cursor Agent hooks — stdin JSON (Cursor `hooks.json` / Agent hooks)
@@ -128,7 +128,7 @@ export type CursorAfterFileEditHookInput = z.infer<typeof CursorAfterFileEditHoo
 /** `hook_event_name: "afterMCPExecution"` — MCP tool completed; includes full result JSON. */
 export const CursorAfterMCPExecutionHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("afterMCPExecution"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: z.string().optional(),
   result_json: z.string().optional(),
   duration: z.number().optional(),
@@ -163,7 +163,7 @@ export type CursorAfterTabFileEditHookInput = z.infer<typeof CursorAfterTabFileE
  */
 export const CursorBeforeMCPExecutionHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("beforeMCPExecution"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: z.string().optional(),
   url: z.string().optional(),
   command: z.string().optional(),
@@ -216,7 +216,7 @@ export type CursorBeforeTabFileReadHookInput = z.infer<
 /** `hook_event_name: "postToolUse"` — after tool execution; `tool_output` is often a JSON string. */
 export const CursorPostToolUseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("postToolUse"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   tool_output: z.union([z.string(), JsonObjectSchema]).optional(),
   duration: z.number().optional(),
@@ -228,7 +228,7 @@ export type CursorPostToolUseHookInput = z.infer<typeof CursorPostToolUseHookInp
 /** `hook_event_name: "postToolUseFailure"` — tool failed, timed out, or was denied. */
 export const CursorPostToolUseFailureHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("postToolUseFailure"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   tool_use_id: z.string().optional(),
   cwd: z.string().optional(),
@@ -257,7 +257,7 @@ export type CursorPreCompactHookInput = z.infer<typeof CursorPreCompactHookInput
 /** `hook_event_name: "preToolUse"` — before a tool runs. */
 export const CursorPreToolUseHookInputSchema = CursorHookInputBaseSchema.extend({
   hook_event_name: z.literal("preToolUse"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   tool_use_id: z.string().optional(),
   cwd: z.string().optional(),

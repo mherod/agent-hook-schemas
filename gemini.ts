@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, OptionalStringField, SharedHookSpecificOutputSchema } from "./common.ts";
+import { JsonObjectSchema, OptionalStringField, OptionalToolNameField, SharedHookSpecificOutputSchema } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Gemini CLI hooks — settings + stdin/stdout (see Gemini CLI hooks reference)
@@ -174,7 +174,7 @@ export type GeminiBeforeToolSelectionInput = z.infer<typeof GeminiBeforeToolSele
 
 export const GeminiBeforeToolInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("BeforeTool"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   mcp_context: JsonObjectSchema.optional(),
   original_request_name: z.string().optional(),
@@ -183,7 +183,7 @@ export type GeminiBeforeToolInput = z.infer<typeof GeminiBeforeToolInputSchema>;
 
 export const GeminiAfterToolInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("AfterTool"),
-  tool_name: z.string().optional(),
+  tool_name: OptionalToolNameField,
   tool_input: JsonObjectSchema.optional(),
   tool_response: JsonObjectSchema.optional(),
   mcp_context: JsonObjectSchema.optional(),
