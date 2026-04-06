@@ -203,9 +203,9 @@ export type SharedHookStdoutCommonFields = z.infer<typeof SharedHookStdoutCommon
 export const HookShellSchema = z.enum(["bash", "powershell"]);
 
 export const HookHandlerCommonSchema = z.object({
-  if: z.string().optional(),
+  if: OptionalStringField,
   timeout: OptionalNumberField,
-  statusMessage: z.string().optional(),
+  statusMessage: OptionalStringField,
   once: OptionalBooleanField,
 });
 
