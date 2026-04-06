@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, NullableStringSchema } from "./common.ts";
+import { JsonObjectSchema, NullableStringSchema, OptionalStringField } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Cursor Agent hooks — stdin JSON (Cursor `hooks.json` / Agent hooks)
@@ -36,13 +36,13 @@ export type CursorHookEventName = z.infer<typeof CursorHookEventNameSchema>;
  * lifecycle). `generation_id` may be an empty string when not yet assigned.
  */
 export const CursorHookInputBaseSchema = z.object({
-  conversation_id: z.string().optional(),
-  generation_id: z.string().optional(),
-  model: z.string().optional(),
-  session_id: z.string().optional(),
-  cursor_version: z.string().optional(),
+  conversation_id: OptionalStringField,
+  generation_id: OptionalStringField,
+  model: OptionalStringField,
+  session_id: OptionalStringField,
+  cursor_version: OptionalStringField,
   workspace_roots: z.array(z.string()).optional(),
-  user_email: z.string().optional(),
+  user_email: OptionalStringField,
   transcript_path: NullableStringSchema.optional(),
 });
 export type CursorHookInputBase = z.infer<typeof CursorHookInputBaseSchema>;

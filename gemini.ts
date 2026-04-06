@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, SharedHookSpecificOutputSchema } from "./common.ts";
+import { JsonObjectSchema, OptionalStringField, SharedHookSpecificOutputSchema } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Gemini CLI hooks — settings + stdin/stdout (see Gemini CLI hooks reference)
@@ -121,10 +121,10 @@ export type GeminiSettings = z.infer<typeof GeminiSettingsSchema>;
 // --- stdin (discriminated on hook_event_name) --------------------------------
 
 const GeminiHookInputBaseSchema = z.object({
-  session_id: z.string().optional(),
-  transcript_path: z.string().optional(),
-  cwd: z.string().optional(),
-  timestamp: z.string().optional(),
+  session_id: OptionalStringField,
+  transcript_path: OptionalStringField,
+  cwd: OptionalStringField,
+  timestamp: OptionalStringField,
 });
 
 export const GeminiSessionStartInputSchema = GeminiHookInputBaseSchema.extend({

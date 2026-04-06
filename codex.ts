@@ -3,6 +3,7 @@ import {
   CommandHookHandlerSchema,
   JsonObjectSchema,
   NullableStringSchema,
+  OptionalStringField,
   SharedCommandMatcherGroupSchema,
   SharedHookStdoutCommonFieldsSchema,
 } from "./common.ts";
@@ -32,10 +33,10 @@ const CodexTranscriptPathSchema = NullableStringSchema;
 
 /** Shared Codex stdin fields (see Codex hooks "Common input fields"). All fields optional for resilient parsing. */
 export const CodexHookInputBaseSchema = z.object({
-  session_id: z.string().optional(),
+  session_id: OptionalStringField,
   transcript_path: CodexTranscriptPathSchema.optional(),
-  cwd: z.string().optional(),
-  model: z.string().optional(),
+  cwd: OptionalStringField,
+  model: OptionalStringField,
 });
 export type CodexHookInputBase = z.infer<typeof CodexHookInputBaseSchema>;
 

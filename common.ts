@@ -8,6 +8,10 @@ export type JsonObject = z.infer<typeof JsonObjectSchema>;
 export const NullableStringSchema = z.union([z.string(), z.null()]);
 export type NullableString = z.infer<typeof NullableStringSchema>;
 
+/** Optional string field for repeated `z.string().optional()` pattern in hook input schemas. */
+export const OptionalStringField = z.string().optional();
+export type OptionalString = z.infer<typeof OptionalStringField>;
+
 export const PreToolPermissionDecisionSchema = z.enum(["allow", "deny", "ask", "defer"]);
 export type PreToolPermissionDecision = z.infer<typeof PreToolPermissionDecisionSchema>;
 
