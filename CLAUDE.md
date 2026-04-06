@@ -71,10 +71,12 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - **Event naming conventions** differ: Claude/Codex use PascalCase (SessionStart, PreToolUse), Cursor uses camelCase (sessionStart, preToolUse), Gemini uses PascalCase with longer names
 
 **Future consolidation opportunities:**
-1. **Optional field pattern**: Many input schemas repeat `z.string().optional()` for session_id, model, cwd. Consider `OptionalStringField` alias if duplication grows.
-2. **Decision output pattern**: The `decision + reason` + `suppressOutput` pattern appears in Codex 3 times — could use a helper schema factory like `createDecisionOutputSchema(DecisionEnum)`.
-3. **Event handler common fields**: `timeout`, `if`, `once` fields repeat in `CommandHookHandlerSchema` and similar across platforms.
-4. **Tool-related base schema**: `tool_name + tool_input + tool_use_id` could be extracted if more platforms join; currently platform variations (string vs JsonObject) prevent this.
+1. **Optional number field pattern** (Issue #6): Extract `z.number().optional()` pattern (20+ instances in cursor.ts token counts, durations, line numbers). Effort: S (1-2 hours).
+2. **Optional boolean field pattern** (Issue #7): Extract `z.boolean().optional()` pattern (30+ instances across claude.ts, cursor.ts, codex.ts). Effort: S (1-2 hours).
+3. **Event handler common fields** (Issue #8): Extract `timeout`, `if`, `once` fields to `HookHandlerCommonFields` in common.ts. Effort: M (half day).
+4. **Gemini schema consolidation** (Issue #9): Analyze gemini.ts for extraction opportunities and document intentional platform-specific patterns. Effort: M (half day).
+5. **Decision enum documentation** (Issue #10): Add in-code comments explaining why decision enums differ across platforms. Effort: XS (<30 minutes).
+6. **Tool-related base schema** (Deferred): `tool_name + tool_input + tool_use_id` could be extracted if more platforms join; currently platform variations (string vs JsonObject) prevent this. Blocked pending platform convergence.
 
 **Backward compatibility:**
 - `CodexNullableStringSchema` is now an alias of `NullableStringSchema` for compatibility
