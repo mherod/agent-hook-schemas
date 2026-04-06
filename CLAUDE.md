@@ -55,6 +55,32 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - **Per-platform Parse functions**: Each platform exports a top-level `Parse*HookInput()` that returns `z.SafeParseReturnType` — one-call parsing of unknown stdin JSON.
 - **All fields optional on input base schemas**: `HookInputBaseSchema` and `CodexHookInputBaseSchema` have all fields optional for resilient parsing of partial payloads.
 
+### Schema Consolidation (Common Patterns)
+
+**Extracted patterns (in `common.ts`):**
+- `NullableStringSchema` — `z.union([z.string(), z.null()])` for fields like `transcript_path`, `last_assistant_message`
+- `ToolCallCoreSchema` — Shared `tool_name` + `tool_input` for Claude and Codex
+- `SharedHookEventNameSchema` — Events present on both Claude and Codex (5 events)
+- `SharedHookSpecificOutputSchema` — Common `hookSpecificOutput` discriminated union
+- `SharedHookStdoutCommonFieldsSchema` — Common stdout fields across platforms
+
+**Intentional platform differences (NOT consolidated):**
+- **Input base schemas** differ significantly: Cursor has rich metadata (generation_id, workspace_roots), Codex is minimal, Gemini adds timestamp
+- **Decision enums** vary: Claude uses `["allow", "deny", "ask", "defer"]` for permission decisions; Codex uses `["allow", "deny", "ask"]` for permissions and `["block"]` for blocks; Gemini uses `["allow", "deny", "block"]`
+- **Tool input types** vary: Claude/Cursor use `JsonObjectSchema`, Codex PreToolUse uses `z.string()` for bash command, Gemini uses `JsonObjectSchema`
+- **Event naming conventions** differ: Claude/Codex use PascalCase (SessionStart, PreToolUse), Cursor uses camelCase (sessionStart, preToolUse), Gemini uses PascalCase with longer names
+
+**Future consolidation opportunities:**
+1. **Optional field pattern**: Many input schemas repeat `z.string().optional()` for session_id, model, cwd. Consider `OptionalStringField` alias if duplication grows.
+2. **Decision output pattern**: The `decision + reason` + `suppressOutput` pattern appears in Codex 3 times — could use a helper schema factory like `createDecisionOutputSchema(DecisionEnum)`.
+3. **Event handler common fields**: `timeout`, `if`, `once` fields repeat in `CommandHookHandlerSchema` and similar across platforms.
+4. **Tool-related base schema**: `tool_name + tool_input + tool_use_id` could be extracted if more platforms join; currently platform variations (string vs JsonObject) prevent this.
+
+**Backward compatibility:**
+- `CodexNullableStringSchema` is now an alias of `NullableStringSchema` for compatibility
+- Do not remove the alias; it documents the extraction relationship
+- Upstream consumers importing `CodexNullableStringSchema` continue to work
+
 ## Bun Runtime
 
 Default to using Bun instead of Node.js.
