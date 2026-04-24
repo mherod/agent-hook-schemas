@@ -28,6 +28,24 @@ export type OptionalBoolean = z.infer<typeof OptionalBooleanField>;
 export const ToolNameSchema = z.string();
 export type ToolName = z.infer<typeof ToolNameSchema>;
 
+/**
+ * Build a cross-agent-tolerant variant of a hook input schema.
+ *
+ * Widens `hook_event_name` to accept any string (including other agents' event
+ * names, e.g., Claude `PreCompact` ↔ Gemini `PreCompress`) and makes all fields
+ * optional. Unknown keys pass through via `.catchall(z.unknown())`.
+ *
+ * Use this in shared dispatch logic that must accept payloads from multiple
+ * agent platforms through a single schema. For strict single-agent parsing,
+ * continue to use the platform-specific schema (e.g., `PreCompactInputSchema`).
+ */
+export function toCrossAgentInputSchema<T extends z.ZodObject>(schema: T) {
+  return schema
+    .partial()
+    .extend({ hook_event_name: OptionalStringField })
+    .catchall(z.unknown());
+}
+
 /** Optional tool name field for repeated `tool_name: z.string().optional()` pattern. */
 export const OptionalToolNameField = z.string().optional();
 export type OptionalToolName = z.infer<typeof OptionalToolNameField>;

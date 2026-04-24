@@ -15,6 +15,7 @@ import {
   SharedHookSpecificUserPromptSubmitOutputSchema,
   ToolCallCoreSchema,
   sharedHookSpecificAdditionalContextSchema,
+  toCrossAgentInputSchema,
 } from "./common.ts";
 
 export type { JsonObject, PreToolPermissionDecision } from "./common.ts";
@@ -518,6 +519,17 @@ export const PreCompactInputSchema = hookStdinLoose("PreCompact", {
   custom_instructions: z.string().optional(),
 });
 export type PreCompactInput = z.infer<typeof PreCompactInputSchema>;
+
+/**
+ * Cross-agent variant of {@link PreCompactInputSchema}: accepts any
+ * `hook_event_name` string (e.g., Gemini's `PreCompress`) while still typing
+ * the `trigger` and `custom_instructions` fields. All fields optional.
+ *
+ * Use this in shared dispatch logic that parses compact-family events across
+ * agent platforms through a single schema.
+ */
+export const PreCompactInputCrossAgentSchema = toCrossAgentInputSchema(PreCompactInputSchema);
+export type PreCompactInputCrossAgent = z.infer<typeof PreCompactInputCrossAgentSchema>;
 
 export const PostCompactInputSchema = hookStdinLoose("PostCompact", {
   trigger: CompactTriggerSchema.optional(),

@@ -37,6 +37,9 @@ import {
   ParseWriteToolInput,
   PermissionRequestAllowAcceptEditsSessionStdoutSchema,
   PermissionRequestAllowStdoutSchema,
+  PreCompactInputCrossAgentSchema,
+  PreCompactInputSchema,
+  GeminiPreCompressInputCrossAgentSchema,
   PromptHookHandlerSchema,
   PromptHookModelResponseSchema,
   ReadToolInputSchema,
@@ -2664,6 +2667,74 @@ describe("issue #3: forward-compatible enums enable safe downstream parsing", ()
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data.hook_event_name).toBe("FutureGeminiEvent");
+    }
+  });
+});
+
+describe("Cross-agent compact-family parsing (#11, #12)", () => {
+  test("PreCompactInputSchema rejects Gemini 'PreCompress' event name", () => {
+    const payload = {
+      session_id: "s1",
+      cwd: "/tmp",
+      hook_event_name: "PreCompress",
+      trigger: "manual",
+    };
+    const r = PreCompactInputSchema.safeParse(payload);
+    expect(r.success).toBe(false);
+  });
+
+  test("PreCompactInputCrossAgentSchema accepts Gemini 'PreCompress' event name", () => {
+    const payload = {
+      session_id: "s1",
+      cwd: "/tmp",
+      hook_event_name: "PreCompress",
+      trigger: "manual",
+      custom_instructions: "Keep API contracts",
+    };
+    const r = PreCompactInputCrossAgentSchema.safeParse(payload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("PreCompress");
+      expect(r.data.trigger).toBe("manual");
+      expect(r.data.custom_instructions).toBe("Keep API contracts");
+    }
+  });
+
+  test("PreCompactInputCrossAgentSchema still accepts Claude 'PreCompact' event name", () => {
+    const payload = {
+      session_id: "s1",
+      cwd: "/tmp",
+      hook_event_name: "PreCompact",
+      trigger: "auto",
+    };
+    const r = PreCompactInputCrossAgentSchema.safeParse(payload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("PreCompact");
+    }
+  });
+
+  test("PreCompactInputCrossAgentSchema tolerates missing hook_event_name (cross-agent parsing)", () => {
+    const payload = {
+      session_id: "s1",
+      trigger: "manual",
+    };
+    const r = PreCompactInputCrossAgentSchema.safeParse(payload);
+    expect(r.success).toBe(true);
+  });
+
+  test("GeminiPreCompressInputCrossAgentSchema accepts Claude 'PreCompact' event name", () => {
+    const payload = {
+      session_id: "s1",
+      cwd: "/tmp",
+      hook_event_name: "PreCompact",
+      trigger: "manual",
+    };
+    const r = GeminiPreCompressInputCrossAgentSchema.safeParse(payload);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.hook_event_name).toBe("PreCompact");
+      expect(r.data.trigger).toBe("manual");
     }
   });
 });

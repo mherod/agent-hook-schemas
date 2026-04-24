@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JsonObjectSchema, OptionalBooleanField, OptionalNumberField, OptionalStringField, OptionalToolNameField, SharedHookSpecificOutputSchema } from "./common.ts";
+import { JsonObjectSchema, OptionalBooleanField, OptionalNumberField, OptionalStringField, OptionalToolNameField, SharedHookSpecificOutputSchema, toCrossAgentInputSchema } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Gemini CLI hooks — settings + stdin/stdout (see Gemini CLI hooks reference)
@@ -196,6 +196,21 @@ export const GeminiPreCompressInputSchema = GeminiHookInputBaseSchema.extend({
   trigger: z.enum(["auto", "manual"]).optional(),
 }).loose();
 export type GeminiPreCompressInput = z.infer<typeof GeminiPreCompressInputSchema>;
+
+/**
+ * Cross-agent variant of {@link GeminiPreCompressInputSchema}: accepts any
+ * `hook_event_name` string (e.g., Claude's `PreCompact`) while still typing
+ * the `trigger` field. All fields optional.
+ *
+ * Use this in shared dispatch logic that parses compact-family events across
+ * agent platforms through a single schema.
+ */
+export const GeminiPreCompressInputCrossAgentSchema = toCrossAgentInputSchema(
+  GeminiPreCompressInputSchema,
+);
+export type GeminiPreCompressInputCrossAgent = z.infer<
+  typeof GeminiPreCompressInputCrossAgentSchema
+>;
 
 export const GeminiNotificationInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("Notification"),

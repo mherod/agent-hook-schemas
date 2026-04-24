@@ -63,6 +63,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - `SharedHookEventNameSchema` — Events present on both Claude and Codex (5 events)
 - `SharedHookSpecificOutputSchema` — Common `hookSpecificOutput` discriminated union
 - `SharedHookStdoutCommonFieldsSchema` — Common stdout fields across platforms
+- `toCrossAgentInputSchema(schema)` — Factory that builds a cross-agent-tolerant variant of a hook input schema. Widens `hook_event_name` to `z.string().optional()` (accepting other agents' event names, e.g., Claude `PreCompact` ↔ Gemini `PreCompress`) and makes all fields optional with `catchall(z.unknown())`. Used by `PreCompactInputCrossAgentSchema` (Claude) and `GeminiPreCompressInputCrossAgentSchema` to support shared downstream dispatch logic that runs payloads from multiple platforms through a single schema. See issues #11/#12.
 
 **Intentional platform differences (NOT consolidated):**
 - **Input base schemas** differ significantly: Cursor has rich metadata (generation_id, workspace_roots), Codex is minimal, Gemini adds timestamp
