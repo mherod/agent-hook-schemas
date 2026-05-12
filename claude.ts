@@ -60,12 +60,15 @@ export type PermissionMode = z.infer<typeof PermissionModeSchema>;
 
 export const HookEventNameSchema = z.enum([
   "SessionStart",
+  "Setup",
   "InstructionsLoaded",
   "UserPromptSubmit",
+  "UserPromptExpansion",
   "PreToolUse",
   "PermissionRequest",
   "PostToolUse",
   "PostToolUseFailure",
+  "PostToolBatch",
   "PermissionDenied",
   "Notification",
   "SubagentStart",
@@ -135,6 +138,8 @@ export const NotificationTypeSchema = z.enum([
   "idle_prompt",
   "auth_success",
   "elicitation_dialog",
+  "elicitation_complete",
+  "elicitation_response",
 ]);
 
 /**
@@ -322,6 +327,14 @@ export const AgentHookContextSchema = z.object({
 });
 export type AgentHookContext = z.infer<typeof AgentHookContextSchema>;
 
+export const EffortLevelSchema = z.enum(["low", "medium", "high", "xhigh", "max"]);
+export type EffortLevel = z.infer<typeof EffortLevelSchema>;
+
+export const HookEffortSchema = z.object({
+  level: EffortLevelSchema,
+});
+export type HookEffort = z.infer<typeof HookEffortSchema>;
+
 /** Shared stdin fields for most hook events (+ optional subagent context). All fields optional for resilient parsing. */
 export const HookInputBaseSchema = z
   .object({
@@ -329,6 +342,7 @@ export const HookInputBaseSchema = z
     transcript_path: z.string().optional(),
     cwd: z.string().optional(),
     permission_mode: PermissionModeInputSchema.optional(),
+    effort: HookEffortSchema.optional(),
   })
   .extend(AgentHookContextSchema.partial().shape);
 export type HookInputBase = z.infer<typeof HookInputBaseSchema>;
@@ -364,6 +378,11 @@ export const SessionStartInputSchema = hookStdinLoose("SessionStart", {
 });
 export type SessionStartInput = z.infer<typeof SessionStartInputSchema>;
 
+export const SetupInputSchema = hookStdinLoose("Setup", {
+  trigger: z.enum(["init", "maintenance"]).optional(),
+});
+export type SetupInput = z.infer<typeof SetupInputSchema>;
+
 export const InstructionsLoadedInputSchema = hookStdinLoose("InstructionsLoaded", {
   file_path: z.string().optional(),
   memory_type: MemoryTypeSchema.optional(),
@@ -378,6 +397,15 @@ export const UserPromptSubmitInputSchema = hookStdinLoose("UserPromptSubmit", {
   prompt: z.string().optional(),
 });
 export type UserPromptSubmitInput = z.infer<typeof UserPromptSubmitInputSchema>;
+
+export const UserPromptExpansionInputSchema = hookStdinLoose("UserPromptExpansion", {
+  expansion_type: z.enum(["slash_command", "mcp_prompt"]).optional(),
+  command_name: z.string().optional(),
+  command_args: z.string().optional(),
+  command_source: z.string().optional(),
+  prompt: z.string().optional(),
+});
+export type UserPromptExpansionInput = z.infer<typeof UserPromptExpansionInputSchema>;
 
 export const PreToolUseInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PreToolUse"),
@@ -404,9 +432,27 @@ export const PostToolUseInputSchema = HookInputBaseSchema.extend({
   .extend({
     tool_response: JsonObjectSchema.optional(),
     tool_use_id: z.string().optional(),
+    duration_ms: z.number().optional(),
   })
   .loose();
 export type PostToolUseInput = z.infer<typeof PostToolUseInputSchema>;
+
+const ToolCallWithResponseSchema = z.object({
+  tool_name: z.string(),
+  tool_input: JsonObjectSchema,
+  tool_use_id: z.string(),
+  tool_response: z.string(),
+});
+export type ToolCallWithResponse = z.infer<typeof ToolCallWithResponseSchema>;
+
+export const PostToolBatchInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.literal("PostToolBatch"),
+})
+  .extend({
+    tool_calls: z.array(ToolCallWithResponseSchema).optional(),
+  })
+  .loose();
+export type PostToolBatchInput = z.infer<typeof PostToolBatchInputSchema>;
 
 export const PostToolUseFailureInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PostToolUseFailure"),
@@ -582,11 +628,14 @@ const UnknownHookEventInputSchema = HookInputBaseSchema.extend({
 /** Discriminated union: parse unknown hook stdin in one step. */
 export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   SessionStartInputSchema,
+  SetupInputSchema,
   InstructionsLoadedInputSchema,
   UserPromptSubmitInputSchema,
+  UserPromptExpansionInputSchema,
   PreToolUseInputSchema,
   PermissionRequestInputSchema,
   PostToolUseInputSchema,
+  PostToolBatchInputSchema,
   PostToolUseFailureInputSchema,
   PermissionDeniedInputSchema,
   NotificationInputSchema,
@@ -713,19 +762,45 @@ export type HookSpecificWorktreeCreateOutput = z.infer<
   typeof HookSpecificWorktreeCreateOutputSchema
 >;
 
+export const HookSpecificSetupOutputSchema = BaseHookSpecificOutputSchema.extend({
+  hookEventName: z.literal("Setup"),
+  additionalContext: z.string().optional(),
+});
+export type HookSpecificSetupOutput = z.infer<typeof HookSpecificSetupOutputSchema>;
+
+export const HookSpecificUserPromptExpansionOutputSchema =
+  BaseHookSpecificOutputSchema.extend({
+    hookEventName: z.literal("UserPromptExpansion"),
+    additionalContext: z.string().optional(),
+  });
+export type HookSpecificUserPromptExpansionOutput = z.infer<
+  typeof HookSpecificUserPromptExpansionOutputSchema
+>;
+
+export const HookSpecificPostToolBatchOutputSchema = BaseHookSpecificOutputSchema.extend({
+  hookEventName: z.literal("PostToolBatch"),
+  additionalContext: z.string().optional(),
+});
+export type HookSpecificPostToolBatchOutput = z.infer<
+  typeof HookSpecificPostToolBatchOutputSchema
+>;
+
 export const HookSpecificOutputSchema = z.union([
   HookSpecificPreToolUseOutputSchema,
   HookSpecificPermissionRequestOutputSchema,
   HookSpecificPermissionDeniedOutputSchema,
   HookSpecificSessionStartOutputSchema,
   HookSpecificUserPromptSubmitOutputSchema,
+  HookSpecificUserPromptExpansionOutputSchema,
   HookSpecificPostToolUseOutputSchema,
+  HookSpecificPostToolBatchOutputSchema,
   HookSpecificPostToolUseFailureOutputSchema,
   HookSpecificSubagentStartOutputSchema,
   HookSpecificNotificationOutputSchema,
   HookSpecificElicitationOutputSchema,
   HookSpecificElicitationResultOutputSchema,
   HookSpecificWorktreeCreateOutputSchema,
+  HookSpecificSetupOutputSchema,
 ]);
 export type HookSpecificOutput = z.infer<typeof HookSpecificOutputSchema>;
 
@@ -739,6 +814,7 @@ export const HookCommandOutputSchema = z
     decision: z.literal("block").optional(),
     reason: z.string().optional(),
     additionalContext: z.string().optional(),
+    sessionTitle: z.string().optional(),
     watchPaths: z.array(z.string()).optional(),
     hookSpecificOutput: HookSpecificOutputSchema.optional(),
   })

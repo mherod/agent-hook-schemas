@@ -174,6 +174,7 @@ export function codexResolutionContextFromInput(
     case "SessionStart":
       return { subject: input.source ?? "" };
     case "PreToolUse":
+    case "PermissionRequest":
     case "PostToolUse":
       return {
         subject: input.tool_name ?? "",

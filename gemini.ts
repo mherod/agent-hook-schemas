@@ -175,7 +175,13 @@ export type GeminiBeforeToolSelectionInput = z.infer<typeof GeminiBeforeToolSele
 export const GeminiBeforeToolInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("BeforeTool"),
   tool_name: OptionalToolNameField,
-  tool_input: JsonObjectSchema.optional(),
+  tool_input: z
+    .object({
+      command: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
   mcp_context: JsonObjectSchema.optional(),
   original_request_name: OptionalStringField,
 }).loose();
@@ -184,7 +190,13 @@ export type GeminiBeforeToolInput = z.infer<typeof GeminiBeforeToolInputSchema>;
 export const GeminiAfterToolInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("AfterTool"),
   tool_name: OptionalToolNameField,
-  tool_input: JsonObjectSchema.optional(),
+  tool_input: z
+    .object({
+      command: z.string().optional(),
+      description: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
   tool_response: JsonObjectSchema.optional(),
   mcp_context: JsonObjectSchema.optional(),
   original_request_name: OptionalStringField,
@@ -216,7 +228,16 @@ export const GeminiNotificationInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("Notification"),
   notification_type: OptionalStringField,
   message: OptionalStringField,
-  details: JsonObjectSchema.optional(),
+  details: z
+    .object({
+      type: z.string().optional(),
+      title: z.string().optional(),
+      serverName: z.string().optional(),
+      toolName: z.string().optional(),
+      toolDisplayName: z.string().optional(),
+    })
+    .passthrough()
+    .optional(),
 }).loose();
 export type GeminiNotificationInput = z.infer<typeof GeminiNotificationInputSchema>;
 

@@ -21,6 +21,7 @@ import {
 export const CodexHookEventNameSchema = z.enum([
   "SessionStart",
   "PreToolUse",
+  "PermissionRequest",
   "PostToolUse",
   "UserPromptSubmit",
   "Stop",
@@ -48,10 +49,12 @@ export type CodexHookInputBase = z.infer<typeof CodexHookInputBaseSchema>;
 /**
  * Bash `tool_input` on Codex PreToolUse stdin (`PreToolUseToolInput` in
  * `pre-tool-use.command.input`; `additionalProperties: false`).
+ * Also used for PermissionRequest (same shape).
  */
 export const CodexPreToolUseBashToolInputSchema = z
   .object({
     command: z.string().optional(),
+    description: z.string().optional(),
   })
   .loose();
 export type CodexPreToolUseBashToolInput = z.infer<typeof CodexPreToolUseBashToolInputSchema>;
@@ -82,6 +85,7 @@ export const CodexSessionStartInputSchema = z
     session_id: z.string().optional(),
     source: CodexSessionStartSourceSchema.optional(),
     transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
   })
   .loose();
 export type CodexSessionStartInput = z.infer<typeof CodexSessionStartInputSchema>;
@@ -112,6 +116,46 @@ export type CodexPreToolUseInput = z.infer<typeof CodexPreToolUseInputSchema>;
  */
 export const CodexPostToolUseBashToolInputSchema = CodexPreToolUseBashToolInputSchema;
 export type CodexPostToolUseBashToolInput = z.infer<typeof CodexPostToolUseBashToolInputSchema>;
+
+/**
+ * `permission_input.description` on Codex hook stdin for PermissionRequest.
+ * Human-readable approval reason, when Codex has one.
+ */
+export const CodexPermissionRequestDescriptionSchema = CodexNullableStringSchema;
+export type CodexPermissionRequestDescription = z.infer<typeof CodexPermissionRequestDescriptionSchema>;
+
+/**
+ * PermissionRequest `tool_input` (same shape as PreToolUse Bash).
+ * Contains the command that requires approval.
+ */
+export const CodexPermissionRequestBashToolInputSchema = CodexPreToolUseBashToolInputSchema;
+export type CodexPermissionRequestBashToolInput = z.infer<typeof CodexPermissionRequestBashToolInputSchema>;
+
+/**
+ * Codex PermissionRequest stdin (`permission-request.command.input`): strict object, no extra keys.
+ * Runs when Codex is about to ask for approval, such as a shell escalation or managed-network approval.
+ * Can allow the request, deny the request, or decline to decide and let the normal approval prompt continue.
+ * Does not run for commands that don't need approval.
+ */
+export const CodexPermissionRequestInputSchema = z
+  .object({
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("PermissionRequest"),
+    model: z.string().optional(),
+    permission_input: z
+      .object({
+        description: CodexNullableStringSchema.optional(),
+      })
+      .optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    tool_input: CodexPermissionRequestBashToolInputSchema.optional(),
+    tool_name: OptionalToolNameField,
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexPermissionRequestInput = z.infer<typeof CodexPermissionRequestInputSchema>;
 
 /**
  * Codex PostToolUse stdin for Bash (`post-tool-use.command.input`): strict object, no extra keys.
@@ -179,6 +223,7 @@ export type CodexStopInput = z.infer<typeof CodexStopInputSchema>;
 export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   CodexSessionStartInputSchema,
   CodexPreToolUseInputSchema,
+  CodexPermissionRequestInputSchema,
   CodexPostToolUseInputSchema,
   CodexUserPromptSubmitInputSchema,
   CodexStopInputSchema,
@@ -206,16 +251,22 @@ export const CodexHooksConfigSchema = z
   .object({
     SessionStart: CodexMatcherGroupListSchema,
     PreToolUse: CodexMatcherGroupListSchema,
+    PermissionRequest: CodexMatcherGroupListSchema,
     PostToolUse: CodexMatcherGroupListSchema,
     UserPromptSubmit: CodexMatcherGroupListSchema,
     Stop: CodexMatcherGroupListSchema,
   })
-  .partial();
+  .partial()
+  .extend({
+    managed_dir: z.string().optional(),
+    windows_managed_dir: z.string().optional(),
+  });
 export type CodexHooksConfig = z.infer<typeof CodexHooksConfigSchema>;
 
 /** Top-level shape next to Codex config layers (`~/.codex/hooks.json`, etc.). */
 export const CodexHooksFileSchema = z
   .object({
+    description: z.string().optional(),
     hooks: CodexHooksConfigSchema,
   })
   .loose();
@@ -238,6 +289,7 @@ export type CodexPreToolUseLegacyBlockStdout = z.infer<typeof CodexPreToolUseLeg
  */
 export const CodexHookEventNameWireSchema = z.enum([
   "PreToolUse",
+  "PermissionRequest",
   "PostToolUse",
   "SessionStart",
   "UserPromptSubmit",
@@ -309,6 +361,40 @@ export type CodexPreToolUseHookSpecificStdout = CodexPreToolUseHookSpecificOutpu
 /** OpenAI JSON Schema `BlockDecisionWire` (top-level `decision` on PostToolUse / UserPromptSubmit-style outputs). */
 export const CodexBlockDecisionWireSchema = z.literal("block");
 export type CodexBlockDecisionWire = z.infer<typeof CodexBlockDecisionWireSchema>;
+
+/**
+ * Inner `hookSpecificOutput` for `permission-request.command.output` (`PermissionRequestHookSpecificOutputWire`;
+ * `additionalProperties: false`).
+ */
+export const CodexPermissionRequestHookSpecificOutputWireSchema = z
+  .object({
+    hookEventName: CodexHookEventNameWireSchema,
+    decision: z
+      .object({
+        behavior: z.enum(["allow", "deny"]),
+        message: CodexNullableStringSchema.optional(),
+      })
+      .strict(),
+  })
+  .strict();
+export type CodexPermissionRequestHookSpecificOutputWire = z.infer<
+  typeof CodexPermissionRequestHookSpecificOutputWireSchema
+>;
+
+/**
+ * OpenAI Codex JSON Schema `permission-request.command.output`: strict top-level object
+ * (`additionalProperties: false`).
+ */
+export const CodexPermissionRequestCommandOutputWireSchema = createCodexCommandOutputSchema(
+  z.enum(["block"]).optional(),
+  CodexPermissionRequestHookSpecificOutputWireSchema,
+);
+export type CodexPermissionRequestCommandOutputWire = z.infer<
+  typeof CodexPermissionRequestCommandOutputWireSchema
+>;
+
+export const CodexPermissionRequestStdoutSchema = CodexPermissionRequestCommandOutputWireSchema;
+export type CodexPermissionRequestStdout = z.infer<typeof CodexPermissionRequestStdoutSchema>;
 
 /**
  * Inner `hookSpecificOutput` for `post-tool-use.command.output` (`PostToolUseHookSpecificOutputWire`;

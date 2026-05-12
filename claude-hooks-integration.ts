@@ -190,16 +190,22 @@ function subjectForClaudeInput(input: HookEventInput): string {
   switch (i.hook_event_name) {
     case "SessionStart":
       return i.source as string;
+    case "Setup":
+      return i.trigger as string;
     case "InstructionsLoaded":
-      return i.file_path as string;
+      return i.load_reason as string;
     case "UserPromptSubmit":
       return i.prompt as string;
+    case "UserPromptExpansion":
+      return i.command_name as string;
     case "PreToolUse":
     case "PermissionRequest":
     case "PostToolUse":
     case "PostToolUseFailure":
     case "PermissionDenied":
       return i.tool_name as string;
+    case "PostToolBatch":
+      return "";
     case "Notification":
       return i.notification_type as string;
     case "SubagentStart":

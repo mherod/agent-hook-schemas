@@ -125,6 +125,7 @@ export const SharedHookSpecificPostToolUseOutputSchema = z
     hookEventName: z.literal("PostToolUse"),
     additionalContext: z.string().optional(),
     updatedMCPToolOutput: z.unknown().optional(),
+    updatedToolOutput: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 export type SharedHookSpecificPostToolUseOutput = z.infer<
@@ -231,7 +232,9 @@ export const HookHandlerCommonSchema = z.object({
 export const CommandHookHandlerSchema = HookHandlerCommonSchema.extend({
   type: z.literal("command"),
   command: z.string(),
+  args: z.array(z.string()).optional(),
   async: OptionalBooleanField,
+  asyncRewake: OptionalBooleanField,
   shell: HookShellSchema.optional(),
 });
 export type CommandHookHandler = z.infer<typeof CommandHookHandlerSchema>;
