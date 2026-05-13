@@ -10,6 +10,8 @@ export default defineConfig({
     "codex-hooks-integration.ts",
     "codex-tasks.ts",
     "common.ts",
+    "copilot.ts",
+    "copilot-hooks-integration.ts",
     "cursor.ts",
     "gemini.ts",
     "gemini-hooks-integration.ts",

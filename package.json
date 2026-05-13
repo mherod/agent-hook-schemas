@@ -1,7 +1,7 @@
 {
   "name": "agent-hook-schemas",
   "version": "0.3.0",
-  "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Gemini CLI, Cursor).",
+  "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Copilot, Gemini CLI, Cursor).",
   "type": "module",
   "sideEffects": false,
   "types": "./dist/index.d.ts",
@@ -35,6 +35,14 @@
       "types": "./dist/common.d.ts",
       "import": "./dist/common.js"
     },
+    "./copilot": {
+      "types": "./dist/copilot.d.ts",
+      "import": "./dist/copilot.js"
+    },
+    "./copilot-hooks-integration": {
+      "types": "./dist/copilot-hooks-integration.d.ts",
+      "import": "./dist/copilot-hooks-integration.js"
+    },
     "./cursor": {
       "types": "./dist/cursor.d.ts",
       "import": "./dist/cursor.js"
@@ -62,6 +70,7 @@
     "agent",
     "claude-code",
     "codex",
+    "copilot",
     "cursor",
     "gemini",
     "hooks",
