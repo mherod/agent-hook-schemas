@@ -7,6 +7,12 @@ import {
   type CodexHookEventName,
   type CodexHooksConfig,
 } from "./codex.ts";
+import {
+  defaultedTimeoutSec,
+  regexMatcherMatches,
+  simpleGlobToRegExp,
+  type HookResolutionContext,
+} from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Config merge
@@ -48,29 +54,7 @@ export function mergeCodexHooksFiles(
  * match-all when omitted, `""`, or `"*"` (Codex hooks docs).
  */
 export function codexMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  if (matcher === undefined || matcher === "" || matcher === "*") return true;
-  try {
-    return new RegExp(matcher).test(subject);
-  } catch {
-    return false;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// `if` guard matching (Bash-only for Codex today)
-// ---------------------------------------------------------------------------
-
-/** Convert a simple glob (`*`, `?`) to a RegExp anchored at both ends. */
-function globToRegExp(globPat: string): RegExp {
-  let re = "";
-  for (let i = 0; i < globPat.length; i++) {
-    const c = globPat[i]!;
-    if (c === "*") re += ".*";
-    else if (c === "?") re += ".";
-    else if (/[.+^${}()|[\]\\]/.test(c)) re += `\\${c}`;
-    else re += c;
-  }
-  return new RegExp(`^${re}$`);
+  return regexMatcherMatches(matcher, subject);
 }
 
 /**
@@ -94,7 +78,7 @@ export function codexToolIfMatches(
 
   let globRe: RegExp;
   try {
-    globRe = globToRegExp(pattern);
+    globRe = simpleGlobToRegExp(pattern);
   } catch {
     return false;
   }
@@ -110,11 +94,7 @@ export function codexToolIfMatches(
 // ---------------------------------------------------------------------------
 
 /** Context for matcher + optional `if` guard. */
-export type CodexHookResolutionContext = {
-  subject: string;
-  toolName?: string;
-  toolInput?: Record<string, unknown>;
-};
+export type CodexHookResolutionContext = HookResolutionContext;
 
 function codexMatcherIgnoredForEvent(
   event: CodexHookEventName,
@@ -204,7 +184,7 @@ export function resolveMatchingCodexHandlersFromInput(
 export function effectiveCodexHandlerTimeoutSec(
   handler: Pick<CodexCommandHookHandler, "timeout" | "timeoutSec">,
 ): number {
-  return handler.timeout ?? handler.timeoutSec ?? 600;
+  return defaultedTimeoutSec(handler.timeout ?? handler.timeoutSec, 600);
 }
 
 // ---------------------------------------------------------------------------

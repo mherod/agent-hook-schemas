@@ -2,10 +2,13 @@
 import { describe, expect, test } from "bun:test";
 import { HookSpecificPreToolUseOutputSchema } from "./claude.ts";
 import {
+  defaultedTimeoutSec,
+  regexMatcherMatches,
   SharedCommandMatcherGroupSchema,
   SharedHookEventNameSchema,
   SharedHookSpecificOutputSchema,
   SharedHookSpecificPreToolUseOutputSchema,
+  simpleGlobToRegExp,
   ToolCallCoreSchema,
 } from "./common.ts";
 
@@ -65,5 +68,33 @@ describe("agent-hook-schemas/common", () => {
       updatedMCPToolOutput: { x: 1 },
     });
     expect(r.success).toBe(true);
+  });
+
+  test("regexMatcherMatches supports wildcard and invalid-regex fail-closed behavior", () => {
+    expect(regexMatcherMatches(undefined, "Bash")).toBe(true);
+    expect(regexMatcherMatches("", "Bash")).toBe(true);
+    expect(regexMatcherMatches("*", "Bash")).toBe(true);
+    expect(regexMatcherMatches("Bash|Read", "Read")).toBe(true);
+    expect(regexMatcherMatches("[unclosed", "Read")).toBe(false);
+  });
+
+  test("regexMatcherMatches supports anchored non-wildcard semantics", () => {
+    expect(regexMatcherMatches(undefined, "bash", { wildcard: false, anchored: true })).toBe(true);
+    expect(regexMatcherMatches("bash", "bash", { wildcard: false, anchored: true })).toBe(true);
+    expect(regexMatcherMatches("ash", "bash", { wildcard: false, anchored: true })).toBe(false);
+    expect(regexMatcherMatches("*", "bash", { wildcard: false, anchored: true })).toBe(false);
+  });
+
+  test("simpleGlobToRegExp anchors glob matching and escapes regex metacharacters", () => {
+    expect(simpleGlobToRegExp("git *").test("git status")).toBe(true);
+    expect(simpleGlobToRegExp("*.ts").test("index.ts")).toBe(true);
+    expect(simpleGlobToRegExp("*.ts").test("index.tsx")).toBe(false);
+    expect(simpleGlobToRegExp("file?.ts").test("file1.ts")).toBe(true);
+    expect(simpleGlobToRegExp("a+b.ts").test("a+b.ts")).toBe(true);
+  });
+
+  test("defaultedTimeoutSec returns explicit timeout or platform default", () => {
+    expect(defaultedTimeoutSec(5, 600)).toBe(5);
+    expect(defaultedTimeoutSec(undefined, 30)).toBe(30);
   });
 });

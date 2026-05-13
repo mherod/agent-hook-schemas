@@ -18,6 +18,7 @@ import {
   GeminiSettingsSchema,
   geminiMatcherPatternCompiles,
 } from "./gemini.ts";
+import { regexMatcherMatches } from "./common.ts";
 
 /** One settings layer: optional `hooks` plus other keys allowed (`.loose()`). */
 const GeminiHooksSettingsLayerSchema = z
@@ -67,11 +68,7 @@ export function geminiMatcherMatches(
   if (matcher === undefined || matcher === "" || matcher === "*") return true;
   if (GEMINI_TOOL_REGEX_EVENTS.has(event)) {
     if (!geminiMatcherPatternCompiles(matcher)) return false;
-    try {
-      return new RegExp(matcher).test(subject);
-    } catch {
-      return false;
-    }
+    return regexMatcherMatches(matcher, subject, { wildcard: false });
   }
   return matcher === subject;
 }

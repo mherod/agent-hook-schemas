@@ -7,6 +7,7 @@ import {
   type CopilotHookHandler,
   type CopilotHooksConfig,
 } from "./copilot.ts";
+import { defaultedTimeoutSec, regexMatcherMatches } from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Config merge
@@ -62,12 +63,7 @@ const COPILOT_MATCHER_EVENTS: ReadonlySet<CopilotHookEventName> = new Set([
  * fail closed, matching the runtime behavior that skips invalid entries.
  */
 export function copilotMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  if (matcher === undefined) return true;
-  try {
-    return new RegExp(`^(?:${matcher})$`).test(subject);
-  } catch {
-    return false;
-  }
+  return regexMatcherMatches(matcher, subject, { wildcard: false, anchored: true });
 }
 
 function copilotEventUsesMatcher(event: CopilotHookEventName): boolean {
@@ -176,7 +172,7 @@ export function resolveMatchingCopilotHandlersFromInput(
 export function effectiveCopilotHandlerTimeoutSec(
   handler: Pick<CopilotHookHandler, "timeoutSec">,
 ): number {
-  return handler.timeoutSec ?? 30;
+  return defaultedTimeoutSec(handler.timeoutSec, 30);
 }
 
 // ---------------------------------------------------------------------------

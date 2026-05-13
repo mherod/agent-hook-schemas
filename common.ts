@@ -50,6 +50,65 @@ export function toCrossAgentInputSchema<T extends z.ZodObject>(schema: T) {
 export const OptionalToolNameField = z.string().optional();
 export type OptionalToolName = z.infer<typeof OptionalToolNameField>;
 
+/** Context used by platform integration helpers for matcher and optional tool guards. */
+export type HookResolutionContext = {
+  subject: string;
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+};
+
+export type RegexMatcherOptions = {
+  /** Treat omitted, empty string, and `*` as match-all. Defaults to true. */
+  wildcard?: boolean;
+  /** Anchor the regex as `^(?:pattern)$`. Defaults to false. */
+  anchored?: boolean;
+};
+
+/**
+ * Match a hook `matcher` RegExp source against a runtime subject.
+ *
+ * Most agents treat omitted, `""`, and `"*"` as wildcards. Copilot uses
+ * anchored regex semantics and only omitted matcher means match-all.
+ * Invalid regular expressions fail closed.
+ */
+export function regexMatcherMatches(
+  matcher: string | undefined,
+  subject: string,
+  options: RegexMatcherOptions = {},
+): boolean {
+  const { wildcard = true, anchored = false } = options;
+  if (matcher === undefined || (wildcard && (matcher === "" || matcher === "*"))) {
+    return true;
+  }
+  try {
+    const source = anchored ? `^(?:${matcher})$` : matcher;
+    return new RegExp(source).test(subject);
+  } catch {
+    return false;
+  }
+}
+
+/** Convert a simple glob (`*`, `?`) to a RegExp anchored at both ends. */
+export function simpleGlobToRegExp(globPat: string): RegExp {
+  let re = "";
+  for (let i = 0; i < globPat.length; i++) {
+    const c = globPat[i]!;
+    if (c === "*") re += ".*";
+    else if (c === "?") re += ".";
+    else if (/[.+^${}()|[\]\\]/.test(c)) re += `\\${c}`;
+    else re += c;
+  }
+  return new RegExp(`^${re}$`);
+}
+
+/** Return an explicit timeout or a platform default timeout, in seconds. */
+export function defaultedTimeoutSec(
+  timeout: number | undefined,
+  defaultTimeoutSec: number,
+): number {
+  return timeout ?? defaultTimeoutSec;
+}
+
 /**
  * Claude Code permission decision values for PreToolUse hooks.
  *

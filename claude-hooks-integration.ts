@@ -12,18 +12,17 @@ import {
   type PermissionRuleString,
   type SettingsPermissions,
 } from "./claude.ts";
+import {
+  defaultedTimeoutSec,
+  regexMatcherMatches,
+  simpleGlobToRegExp,
+  type HookResolutionContext,
+} from "./common.ts";
 
 const CLAUDE_HOOK_EVENTS = HookEventNameSchema.options;
 
-/**
- * Context for matcher + optional `if` (tool-shaped stdin only). `subject` is matched with
- * {@link claudeMatcherMatches} (JavaScript RegExp when not wildcard).
- */
-export type ClaudeHookResolutionContext = {
-  subject: string;
-  toolName?: string;
-  toolInput?: Record<string, unknown>;
-};
+/** Context for matcher + optional `if` (tool-shaped stdin only). */
+export type ClaudeHookResolutionContext = HookResolutionContext;
 
 /**
  * Merge hook matcher groups from multiple Claude settings fragments (user + project + local +
@@ -59,25 +58,7 @@ export function mergeClaudeHooksFiles(
  * (Claude Code hooks guide).
  */
 export function claudeMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  if (matcher === undefined || matcher === "" || matcher === "*") return true;
-  try {
-    return new RegExp(matcher).test(subject);
-  } catch {
-    return false;
-  }
-}
-
-/** Convert a simple glob (`*`, `?`) to a RegExp anchored at both ends. */
-function globToRegExp(globPat: string): RegExp {
-  let re = "";
-  for (let i = 0; i < globPat.length; i++) {
-    const c = globPat[i]!;
-    if (c === "*") re += ".*";
-    else if (c === "?") re += ".";
-    else if (/[.+^${}()|[\]\\]/.test(c)) re += `\\${c}`;
-    else re += c;
-  }
-  return new RegExp(`^${re}$`);
+  return regexMatcherMatches(matcher, subject);
 }
 
 /**
@@ -100,7 +81,7 @@ export function claudeToolIfMatches(
 
   let globRe: RegExp;
   try {
-    globRe = globToRegExp(pattern);
+    globRe = simpleGlobToRegExp(pattern);
   } catch {
     return false;
   }
@@ -261,7 +242,7 @@ export function resolveMatchingClaudeHandlersFromInput(
 
 /** Effective timeout in seconds (Claude command/http handlers; default 600 when omitted). */
 export function effectiveClaudeHandlerTimeoutSec(handler: Pick<HookHandler, "timeout">): number {
-  return handler.timeout ?? 600;
+  return defaultedTimeoutSec(handler.timeout, 600);
 }
 
 // ---------------------------------------------------------------------------
