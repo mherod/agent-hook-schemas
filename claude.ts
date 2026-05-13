@@ -18,7 +18,7 @@ import {
   toCrossAgentInputSchema,
 } from "./common.ts";
 
-export type { JsonObject, PreToolPermissionDecision } from "./common.ts";
+export type { CommandHookHandler, JsonObject, PreToolPermissionDecision } from "./common.ts";
 export {
   CommandHookHandlerSchema,
   HookShellSchema,
@@ -839,8 +839,6 @@ const PromptOrAgentHookPromptFieldsSchema = z.object({
   prompt: z.string(),
   model: z.string().optional(),
 });
-
-export type CommandHookHandler = z.infer<typeof CommandHookHandlerSchema>;
 
 export const HttpHookHandlerSchema = HookHandlerCommonSchema.extend({
   type: z.literal("http"),

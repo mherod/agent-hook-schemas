@@ -8,6 +8,7 @@ import {
   type GeminiHookEventInput,
   type GeminiHookEventName,
   type GeminiHooksConfig,
+  type GeminiMatcherGroup,
   type GeminiNotificationInput,
   type GeminiPreCompressInput,
   type GeminiSessionEndInput,
@@ -18,7 +19,11 @@ import {
   GeminiSettingsSchema,
   geminiMatcherPatternCompiles,
 } from "./gemini.ts";
-import { regexMatcherMatches } from "./common.ts";
+import {
+  mergeHookConfigLayers,
+  parseSchemaResult,
+  regexMatcherMatches,
+} from "./common.ts";
 
 /** One settings layer: optional `hooks` plus other keys allowed (`.loose()`). */
 const GeminiHooksSettingsLayerSchema = z
@@ -41,19 +46,16 @@ export function mergeGeminiHooksFiles(
 ):
   | { ok: true; config: GeminiHooksConfig }
   | { ok: false; index: number; error: z.ZodError } {
-  const merged: GeminiHooksConfig = {};
-  for (let i = 0; i < files.length; i++) {
-    const parsed = GeminiHooksSettingsLayerSchema.safeParse(files[i]);
-    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
-    const hooks = parsed.data.hooks;
-    if (!hooks) continue;
-    for (const event of GEMINI_HOOK_EVENTS) {
-      const list = hooks[event];
-      if (!list?.length) continue;
-      merged[event] = [...(merged[event] ?? []), ...list];
-    }
-  }
-  return { ok: true, config: merged };
+  return mergeHookConfigLayers<
+    GeminiHookEventName,
+    GeminiMatcherGroup,
+    typeof GeminiHooksSettingsLayerSchema
+  >({
+    files,
+    schema: GeminiHooksSettingsLayerSchema,
+    events: GEMINI_HOOK_EVENTS,
+    getHooks: (layer) => layer.hooks,
+  });
 }
 
 /**
@@ -177,7 +179,5 @@ export function resolveMatchingGeminiHandlerGroups(
 export function parseGeminiSettings(json: unknown):
   | { ok: true; settings: GeminiSettings }
   | { ok: false; error: z.ZodError } {
-  const result = GeminiSettingsSchema.safeParse(json);
-  if (!result.success) return { ok: false, error: result.error };
-  return { ok: true, settings: result.data };
+  return parseSchemaResult(GeminiSettingsSchema, json, "settings");
 }

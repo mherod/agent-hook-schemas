@@ -1,8 +1,12 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import { HookSpecificPreToolUseOutputSchema } from "./claude.ts";
 import {
+  appendHookEntriesByEvent,
   defaultedTimeoutSec,
+  mergeHookConfigLayers,
+  parseSchemaResult,
   regexMatcherMatches,
   SharedCommandMatcherGroupSchema,
   SharedHookEventNameSchema,
@@ -96,5 +100,79 @@ describe("agent-hook-schemas/common", () => {
   test("defaultedTimeoutSec returns explicit timeout or platform default", () => {
     expect(defaultedTimeoutSec(5, 600)).toBe(5);
     expect(defaultedTimeoutSec(undefined, 30)).toBe(30);
+  });
+
+  test("parseSchemaResult returns keyed success and Zod errors", () => {
+    const schema = z.object({ hooks: z.object({}).partial() });
+    expect(parseSchemaResult(schema, { hooks: {} }, "settings")).toEqual({
+      ok: true,
+      settings: { hooks: {} },
+    });
+
+    const invalid = parseSchemaResult(schema, { hooks: "bad" }, "settings");
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.error).toBeInstanceOf(z.ZodError);
+  });
+
+  test("appendHookEntriesByEvent appends only known event entries", () => {
+    type Event = "PreToolUse" | "Stop";
+    type Entry = { command: string };
+    const target: Partial<Record<Event, Entry[]>> = {
+      PreToolUse: [{ command: "a" }],
+    };
+
+    appendHookEntriesByEvent(
+      target,
+      {
+        PreToolUse: [{ command: "b" }],
+        Stop: [{ command: "c" }],
+      },
+      ["PreToolUse", "Stop"],
+    );
+
+    expect(target).toEqual({
+      PreToolUse: [{ command: "a" }, { command: "b" }],
+      Stop: [{ command: "c" }],
+    });
+  });
+
+  test("mergeHookConfigLayers validates files and supports reset/skip policies", () => {
+    const layerSchema = z.object({
+      reset: z.boolean().optional(),
+      skip: z.boolean().optional(),
+      hooks: z
+        .object({
+          Stop: z.array(z.object({ command: z.string() })).optional(),
+        })
+        .optional(),
+    });
+
+    const result = mergeHookConfigLayers<"Stop", { command: string }, typeof layerSchema>({
+      files: [
+        { hooks: { Stop: [{ command: "a" }] } },
+        { reset: true, hooks: { Stop: [{ command: "b" }] } },
+        { skip: true, hooks: { Stop: [{ command: "ignored" }] } },
+        { hooks: { Stop: [{ command: "c" }] } },
+      ],
+      schema: layerSchema,
+      events: ["Stop"],
+      getHooks: (layer) => layer.hooks,
+      shouldReset: (layer) => layer.reset === true,
+      shouldSkip: (layer) => layer.skip === true,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      config: { Stop: [{ command: "b" }, { command: "c" }] },
+    });
+
+    const invalid = mergeHookConfigLayers<"Stop", { command: string }, typeof layerSchema>({
+      files: [{ hooks: { Stop: "bad" } }],
+      schema: layerSchema,
+      events: ["Stop"],
+      getHooks: (layer) => layer.hooks,
+    });
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) expect(invalid.index).toBe(0);
   });
 });

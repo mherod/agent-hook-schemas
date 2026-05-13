@@ -109,6 +109,71 @@ export function defaultedTimeoutSec(
   return timeout ?? defaultTimeoutSec;
 }
 
+export type ParsedSchemaResult<Key extends string, Value> =
+  | ({ ok: true } & Record<Key, Value>)
+  | { ok: false; error: z.ZodError };
+
+/** Parse an unknown JSON value and return the repository's common `{ ok, ... }` result shape. */
+export function parseSchemaResult<const Key extends string, Value>(
+  schema: z.ZodType<Value>,
+  json: unknown,
+  valueKey: Key,
+): ParsedSchemaResult<Key, Value> {
+  const result = schema.safeParse(json);
+  if (!result.success) return { ok: false, error: result.error };
+  return { ok: true, [valueKey]: result.data } as ParsedSchemaResult<Key, Value>;
+}
+
+/** Append hook entries from `source` into `target` for a platform's known event names. */
+export function appendHookEntriesByEvent<EventName extends string, Entry>(
+  target: Partial<Record<EventName, Entry[]>>,
+  source: Partial<Record<EventName, Entry[]>> | undefined,
+  events: readonly EventName[],
+): void {
+  if (!source) return;
+  for (const event of events) {
+    const entries = source[event];
+    if (!entries?.length) continue;
+    target[event] = [...(target[event] ?? []), ...entries];
+  }
+}
+
+export type MergeHookConfigLayersOptions<
+  EventName extends string,
+  Entry,
+  Schema extends z.ZodTypeAny,
+> = {
+  files: unknown[];
+  schema: Schema;
+  events: readonly EventName[];
+  getHooks: (layer: z.output<Schema>) => Partial<Record<EventName, Entry[]>> | undefined;
+  shouldReset?: (layer: z.output<Schema>) => boolean;
+  shouldSkip?: (layer: z.output<Schema>) => boolean;
+};
+
+/** Validate and merge hook config layers that append entries by event name. */
+export function mergeHookConfigLayers<
+  EventName extends string,
+  Entry,
+  Schema extends z.ZodTypeAny,
+>(
+  options: MergeHookConfigLayersOptions<EventName, Entry, Schema>,
+):
+  | { ok: true; config: Partial<Record<EventName, Entry[]>> }
+  | { ok: false; index: number; error: z.ZodError } {
+  let merged: Partial<Record<EventName, Entry[]>> = {};
+  for (let i = 0; i < options.files.length; i++) {
+    const parsed = options.schema.safeParse(options.files[i]);
+    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
+    if (options.shouldReset?.(parsed.data)) {
+      merged = {};
+    }
+    if (options.shouldSkip?.(parsed.data)) continue;
+    appendHookEntriesByEvent(merged, options.getHooks(parsed.data), options.events);
+  }
+  return { ok: true, config: merged };
+}
+
 /**
  * Claude Code permission decision values for PreToolUse hooks.
  *

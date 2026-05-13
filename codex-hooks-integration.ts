@@ -6,9 +6,12 @@ import {
   type CodexHookEventInput,
   type CodexHookEventName,
   type CodexHooksConfig,
+  type CodexMatcherGroup,
 } from "./codex.ts";
 import {
   defaultedTimeoutSec,
+  mergeHookConfigLayers,
+  parseSchemaResult,
   regexMatcherMatches,
   simpleGlobToRegExp,
   type HookResolutionContext,
@@ -28,21 +31,15 @@ export function mergeCodexHooksFiles(
 ):
   | { ok: true; config: CodexHooksConfig }
   | { ok: false; index: number; error: z.ZodError } {
-  const merged: CodexHooksConfig = {};
   // Lazy evaluation: extract options inside function to avoid module-level initialization
   // issues when bundler splits this into separate chunks
   const codexHookEvents = CodexHookEventNameSchema.options;
-  for (let i = 0; i < files.length; i++) {
-    const parsed = CodexHooksFileSchema.safeParse(files[i]);
-    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
-    const hooks = parsed.data.hooks;
-    for (const event of codexHookEvents) {
-      const groups = hooks[event];
-      if (!groups?.length) continue;
-      merged[event] = [...(merged[event] ?? []), ...groups];
-    }
-  }
-  return { ok: true, config: merged };
+  return mergeHookConfigLayers<CodexHookEventName, CodexMatcherGroup, typeof CodexHooksFileSchema>({
+    files,
+    schema: CodexHooksFileSchema,
+    events: codexHookEvents,
+    getHooks: (layer) => layer.hooks,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -53,9 +50,8 @@ export function mergeCodexHooksFiles(
  * `matcher` is a regex on the subject field (tool name or session source), or
  * match-all when omitted, `""`, or `"*"` (Codex hooks docs).
  */
-export function codexMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  return regexMatcherMatches(matcher, subject);
-}
+export const codexMatcherMatches: (matcher: string | undefined, subject: string) => boolean =
+  regexMatcherMatches;
 
 /**
  * Evaluate a handler's `if` guard against a Codex tool call.
@@ -195,7 +191,7 @@ export function effectiveCodexHandlerTimeoutSec(
 export function parseCodexHooksFile(json: unknown):
   | { ok: true; config: CodexHooksConfig }
   | { ok: false; error: z.ZodError } {
-  const result = CodexHooksFileSchema.safeParse(json);
-  if (!result.success) return { ok: false, error: result.error };
-  return { ok: true, config: result.data.hooks };
+  const result = parseSchemaResult(CodexHooksFileSchema, json, "file");
+  if (!result.ok) return result;
+  return { ok: true, config: result.file.hooks };
 }

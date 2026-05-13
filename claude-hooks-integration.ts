@@ -9,11 +9,15 @@ import {
   type HookEventName,
   type HookHandler,
   type HooksConfig,
+  type MatcherGroup,
   type PermissionRuleString,
   type SettingsPermissions,
 } from "./claude.ts";
 import {
+  appendHookEntriesByEvent,
   defaultedTimeoutSec,
+  mergeHookConfigLayers,
+  parseSchemaResult,
   regexMatcherMatches,
   simpleGlobToRegExp,
   type HookResolutionContext,
@@ -35,31 +39,21 @@ export type ClaudeHookResolutionContext = HookResolutionContext;
 export function mergeClaudeHooksFiles(
   files: unknown[],
 ): { ok: true; config: HooksConfig } | { ok: false; index: number; error: z.ZodError } {
-  let merged: HooksConfig = {};
-  for (let i = 0; i < files.length; i++) {
-    const parsed = ClaudeSettingsFragmentSchema.safeParse(files[i]);
-    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
-    if (parsed.data.disableAllHooks) {
-      merged = {};
-    }
-    const hooks = parsed.data.hooks;
-    if (!hooks) continue;
-    for (const event of CLAUDE_HOOK_EVENTS) {
-      const list = hooks[event];
-      if (!list?.length) continue;
-      merged[event] = [...(merged[event] ?? []), ...list];
-    }
-  }
-  return { ok: true, config: merged };
+  return mergeHookConfigLayers<HookEventName, MatcherGroup, typeof ClaudeSettingsFragmentSchema>({
+    files,
+    schema: ClaudeSettingsFragmentSchema,
+    events: CLAUDE_HOOK_EVENTS,
+    getHooks: (layer) => layer.hooks,
+    shouldReset: (layer) => layer.disableAllHooks === true,
+  });
 }
 
 /**
  * Hook `matcher` is a RegExp source on `subject`, or match-all when omitted, `""`, or `"*"`
  * (Claude Code hooks guide).
  */
-export function claudeMatcherMatches(matcher: string | undefined, subject: string): boolean {
-  return regexMatcherMatches(matcher, subject);
-}
+export const claudeMatcherMatches: (matcher: string | undefined, subject: string) => boolean =
+  regexMatcherMatches;
 
 /**
  * `if` permission-rule style guard (`Bash(git *)`, `Edit(*.ts)`). When `if` is set but stdin is
@@ -241,9 +235,8 @@ export function resolveMatchingClaudeHandlersFromInput(
 }
 
 /** Effective timeout in seconds (Claude command/http handlers; default 600 when omitted). */
-export function effectiveClaudeHandlerTimeoutSec(handler: Pick<HookHandler, "timeout">): number {
-  return defaultedTimeoutSec(handler.timeout, 600);
-}
+export const effectiveClaudeHandlerTimeoutSec = (handler: Pick<HookHandler, "timeout">): number =>
+  defaultedTimeoutSec(handler.timeout, 600);
 
 // ---------------------------------------------------------------------------
 // Permission rule matching (settings.json `permissions.allow` / `permissions.deny`)
@@ -361,11 +354,7 @@ export function mergeClaudeSettings(
       disableAllHooks = true;
     }
     if (data.hooks) {
-      for (const event of CLAUDE_HOOK_EVENTS) {
-        const list = data.hooks[event];
-        if (!list?.length) continue;
-        hooks[event] = [...(hooks[event] ?? []), ...list];
-      }
+      appendHookEntriesByEvent(hooks, data.hooks, CLAUDE_HOOK_EVENTS);
     }
 
     // Permissions
@@ -398,7 +387,5 @@ export function mergeClaudeSettings(
 export function parseClaudeSettings(json: unknown):
   | { ok: true; settings: ClaudeSettings }
   | { ok: false; error: z.ZodError } {
-  const result = ClaudeSettingsSchema.safeParse(json);
-  if (!result.success) return { ok: false, error: result.error };
-  return { ok: true, settings: result.data };
+  return parseSchemaResult(ClaudeSettingsSchema, json, "settings");
 }

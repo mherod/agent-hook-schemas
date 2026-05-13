@@ -7,7 +7,12 @@ import {
   type CopilotHookHandler,
   type CopilotHooksConfig,
 } from "./copilot.ts";
-import { defaultedTimeoutSec, regexMatcherMatches } from "./common.ts";
+import {
+  defaultedTimeoutSec,
+  mergeHookConfigLayers,
+  parseSchemaResult,
+  regexMatcherMatches,
+} from "./common.ts";
 
 // ---------------------------------------------------------------------------
 // Config merge
@@ -22,23 +27,14 @@ export function mergeCopilotHooksFiles(
 ):
   | { ok: true; config: CopilotHooksConfig }
   | { ok: false; index: number; error: z.ZodError } {
-  const merged: CopilotHooksConfig = {};
   const events = CopilotHookEventNameSchema.options;
-
-  for (let i = 0; i < files.length; i++) {
-    const parsed = CopilotHooksFileSchema.safeParse(files[i]);
-    if (!parsed.success) return { ok: false, index: i, error: parsed.error };
-    if (parsed.data.disableAllHooks === true) continue;
-
-    const hooks = parsed.data.hooks;
-    for (const event of events) {
-      const handlers = hooks[event];
-      if (!handlers?.length) continue;
-      merged[event] = [...(merged[event] ?? []), ...handlers];
-    }
-  }
-
-  return { ok: true, config: merged };
+  return mergeHookConfigLayers<CopilotHookEventName, CopilotHookHandler, typeof CopilotHooksFileSchema>({
+    files,
+    schema: CopilotHooksFileSchema,
+    events,
+    getHooks: (layer) => layer.hooks,
+    shouldSkip: (layer) => layer.disableAllHooks === true,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -169,11 +165,9 @@ export function resolveMatchingCopilotHandlersFromInput(
 }
 
 /** Effective timeout in seconds (Copilot default: 30). */
-export function effectiveCopilotHandlerTimeoutSec(
+export const effectiveCopilotHandlerTimeoutSec = (
   handler: Pick<CopilotHookHandler, "timeoutSec">,
-): number {
-  return defaultedTimeoutSec(handler.timeoutSec, 30);
-}
+): number => defaultedTimeoutSec(handler.timeoutSec, 30);
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -183,8 +177,8 @@ export function effectiveCopilotHandlerTimeoutSec(
 export function parseCopilotHooksFile(json: unknown):
   | { ok: true; config: CopilotHooksConfig }
   | { ok: false; error: z.ZodError } {
-  const result = CopilotHooksFileSchema.safeParse(json);
-  if (!result.success) return { ok: false, error: result.error };
-  if (result.data.disableAllHooks === true) return { ok: true, config: {} };
-  return { ok: true, config: result.data.hooks };
+  const result = parseSchemaResult(CopilotHooksFileSchema, json, "file");
+  if (!result.ok) return result;
+  if (result.file.disableAllHooks === true) return { ok: true, config: {} };
+  return { ok: true, config: result.file.hooks };
 }

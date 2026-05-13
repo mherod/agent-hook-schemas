@@ -120,40 +120,30 @@ export function ParseUpdatePlanArguments(argumentsText: string) {
  * name. This now parses the `update_plan` argument payload rather than Claude
  * task-update tool input.
  */
-export function ParseCodexTaskCreateToolInput(toolInput: unknown) {
-  return ParseUpdatePlanToolInput(toolInput);
-}
+export const ParseCodexTaskCreateToolInput = ParseUpdatePlanToolInput;
 
 /**
  * Legacy helper retained for compatibility with the previous Codex task module
  * name. This now parses the `update_plan` arguments payload.
  */
-export function ParseCodexTaskUpdateToolInput(toolInput: unknown) {
-  return ParseUpdatePlanToolInput(toolInput);
-}
+export const ParseCodexTaskUpdateToolInput = ParseUpdatePlanToolInput;
 
 /**
  * Legacy helper retained for compatibility with the previous Codex task module
  * name. This now parses the outer `update_plan` function-call output.
  */
-export function ParseCodexTaskUpdateToolResponse(toolResponse: unknown) {
-  return ParseUpdatePlanFunctionCallOutput(toolResponse);
-}
+export const ParseCodexTaskUpdateToolResponse = ParseUpdatePlanFunctionCallOutput;
 
 /**
  * Legacy helper retained for compatibility with the previous Codex task module
  * name. `update_plan` has no list/get response, so this simply reuses the
  * argument parser.
  */
-export function ParseCodexTaskListToolResponse(toolResponse: unknown) {
-  return ParseUpdatePlanToolInput(toolResponse);
-}
+export const ParseCodexTaskListToolResponse = ParseUpdatePlanToolInput;
 
 /**
  * Legacy helper retained for compatibility with the previous Codex task module
  * name. `update_plan` has no list/get response, so this simply reuses the
  * argument parser.
  */
-export function ParseCodexTaskGetToolResponse(toolResponse: unknown) {
-  return ParseUpdatePlanToolInput(toolResponse);
-}
+export const ParseCodexTaskGetToolResponse = ParseUpdatePlanToolInput;
