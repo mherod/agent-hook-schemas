@@ -14,6 +14,17 @@ bun test --concurrent -t "pattern"  # run tests matching a name pattern
 
 Always verify with `bun run build && bun test --concurrent` before committing schema changes.
 
+## npm Publish
+
+```bash
+bunx npm publish --otp=$(op item get "Npmjs" --otp)
+```
+
+- `bun publish` ignores `.npmrc` auth tokens and falls back to browser WebAuthn flow
+- `pnpm publish` fails with `ERR_PNPM_OTP_NON_INTERACTIVE` in non-interactive terminals
+- `bunx npm publish` reads `.npmrc` correctly and accepts `--otp`
+- The `.npmrc.tpl` uses 1Password `op://` syntax for the auth token
+
 ## Architecture
 
 This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across four platforms: **Claude Code**, **OpenAI Codex**, **Gemini CLI**, and **Cursor**.
