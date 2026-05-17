@@ -32,8 +32,6 @@ const GeminiHooksSettingsLayerSchema = z
   })
   .loose();
 
-const GEMINI_HOOK_EVENTS = GeminiHookEventNameSchema.options;
-
 /** Tool events: `matcher` is a RegExp on the tool name. Other events: exact string match on the subject. */
 const GEMINI_TOOL_REGEX_EVENTS: ReadonlySet<GeminiHookEventName> = new Set(["BeforeTool", "AfterTool"]);
 
@@ -46,6 +44,9 @@ export function mergeGeminiHooksFiles(
 ):
   | { ok: true; config: GeminiHooksConfig }
   | { ok: false; index: number; error: z.ZodError } {
+  // Lazy evaluation: extract options inside function to avoid module-level initialization
+  // issues when bundler splits this into separate chunks
+  const geminiHookEvents = GeminiHookEventNameSchema.options;
   return mergeHookConfigLayers<
     GeminiHookEventName,
     GeminiMatcherGroup,
@@ -53,7 +54,7 @@ export function mergeGeminiHooksFiles(
   >({
     files,
     schema: GeminiHooksSettingsLayerSchema,
-    events: GEMINI_HOOK_EVENTS,
+    events: geminiHookEvents,
     getHooks: (layer) => layer.hooks,
   });
 }

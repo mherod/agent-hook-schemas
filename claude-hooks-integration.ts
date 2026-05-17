@@ -23,8 +23,6 @@ import {
   type HookResolutionContext,
 } from "./common.ts";
 
-const CLAUDE_HOOK_EVENTS = HookEventNameSchema.options;
-
 /** Context for matcher + optional `if` (tool-shaped stdin only). */
 export type ClaudeHookResolutionContext = HookResolutionContext;
 
@@ -39,10 +37,13 @@ export type ClaudeHookResolutionContext = HookResolutionContext;
 export function mergeClaudeHooksFiles(
   files: unknown[],
 ): { ok: true; config: HooksConfig } | { ok: false; index: number; error: z.ZodError } {
+  // Lazy evaluation: extract options inside function to avoid module-level initialization
+  // issues when bundler splits this into separate chunks
+  const claudeHookEvents = HookEventNameSchema.options;
   return mergeHookConfigLayers<HookEventName, MatcherGroup, typeof ClaudeSettingsFragmentSchema>({
     files,
     schema: ClaudeSettingsFragmentSchema,
-    events: CLAUDE_HOOK_EVENTS,
+    events: claudeHookEvents,
     getHooks: (layer) => layer.hooks,
     shouldReset: (layer) => layer.disableAllHooks === true,
   });
@@ -354,7 +355,7 @@ export function mergeClaudeSettings(
       disableAllHooks = true;
     }
     if (data.hooks) {
-      appendHookEntriesByEvent(hooks, data.hooks, CLAUDE_HOOK_EVENTS);
+      appendHookEntriesByEvent(hooks, data.hooks, HookEventNameSchema.options);
     }
 
     // Permissions
