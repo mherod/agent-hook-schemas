@@ -65,6 +65,18 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
   ```
 - **Per-platform Parse functions**: Each platform exports a top-level `Parse*HookInput()` that returns `z.SafeParseReturnType` — one-call parsing of unknown stdin JSON.
 - **All fields optional on input base schemas**: `HookInputBaseSchema` and `CodexHookInputBaseSchema` have all fields optional for resilient parsing of partial payloads.
+- **Lazy evaluation in integration modules** (Issues #4, #13): Never access `SomeSchema.options` at module level in `*-hooks-integration.ts` files. tsup/esbuild chunk splitting causes the schema chunk to be uninitialized when the integration module runs, yielding `undefined`. Always access `.options` inside the function body:
+  ```ts
+  // WRONG — module level, breaks with chunk splitting
+  const CLAUDE_HOOK_EVENTS = HookEventNameSchema.options;
+
+  // RIGHT — lazy, inside the function that uses it
+  export function mergeClaudeHooksFiles(files: unknown[]) {
+    const claudeHookEvents = HookEventNameSchema.options;
+    return mergeHookConfigLayers({ ..., events: claudeHookEvents });
+  }
+  ```
+  This applies to all three integration files: `claude-hooks-integration.ts`, `codex-hooks-integration.ts`, `gemini-hooks-integration.ts`.
 
 ### Schema Consolidation (Common Patterns)
 
