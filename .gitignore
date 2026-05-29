@@ -38,3 +38,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 AGENTS.md
 .npmrc
 .npmrc.tpl
+
+# pnpm artifacts (this is a Bun-only project)
+pnpm-lock.yaml
+pnpm-workspace.yaml

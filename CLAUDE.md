@@ -27,7 +27,7 @@ bunx npm publish --otp=$(op item get "Npmjs" --otp)
 
 ## Architecture
 
-This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across four platforms: **Claude Code**, **OpenAI Codex**, **Gemini CLI**, and **Cursor**.
+This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across five platforms: **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Gemini CLI**, and **Cursor**.
 
 ### Module layout (each is a separate subpath export via `package.json` `exports` + `tsup.config.ts` entry)
 
