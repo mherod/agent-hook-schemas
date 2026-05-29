@@ -1,5 +1,4 @@
 /// <reference types="bun" />
-import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   type GeminiHookEventName,
@@ -20,25 +19,10 @@ import {
   resolveMatchingGeminiHandlers,
   resolveMatchingGeminiHandlersFromInput,
 } from "./gemini-hooks-integration.ts";
+import { readHookSample } from "./test-utils.ts";
 
-const GEMINI_HOOK_TMP = "/private/tmp";
-
-function readGeminiHookSample(
-  name: string,
-  event: GeminiHookEventName,
-): unknown | null {
-  const p = `${GEMINI_HOOK_TMP}/${name}`;
-  if (!existsSync(p)) return null;
-  let data: unknown;
-  try {
-    data = JSON.parse(readFileSync(p, "utf8"));
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null) return null;
-  if ((data as { hook_event_name?: unknown }).hook_event_name !== event) return null;
-  return data;
-}
+const readGeminiHookSample = (name: string, event: GeminiHookEventName) =>
+  readHookSample(name, event);
 
 const baseStdin = {
   session_id: "s1",

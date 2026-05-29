@@ -1,31 +1,13 @@
 /// <reference types="bun" />
-import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   type CursorHookEventName,
   ParseCursorHookInput,
 } from "./cursor.ts";
+import { readHookSample } from "./test-utils.ts";
 
-const HOOK_TMP = "/private/tmp";
-
-/** Read `/private/tmp` capture only if `hook_event_name` matches (avoids stale wrong-format files). */
-function readCursorHookSample(
-  name: string,
-  event: CursorHookEventName,
-): unknown | null {
-  const p = `${HOOK_TMP}/${name}`;
-  if (!existsSync(p)) return null;
-  let data: unknown;
-  try {
-    data = JSON.parse(readFileSync(p, "utf8"));
-  } catch {
-    return null;
-  }
-  if (typeof data !== "object" || data === null) return null;
-  const nameField = (data as { hook_event_name?: unknown }).hook_event_name;
-  if (nameField !== event) return null;
-  return data;
-}
+const readCursorHookSample = (name: string, event: CursorHookEventName) =>
+  readHookSample(name, event);
 
 describe("Cursor hooks (stdin)", () => {
   test("stop: real sample shape", () => {
