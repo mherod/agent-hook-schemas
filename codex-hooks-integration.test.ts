@@ -316,6 +316,72 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
       ),
     ).toEqual(["resume.sh"]);
   });
+
+  test("SubagentStop uses agent_type as matcher subject", () => {
+    const merged = mergeCodexHooksFiles([
+      {
+        hooks: {
+          SubagentStop: [
+            { matcher: "Explore", hooks: [cmd("explore-stop.sh")] },
+            { matcher: "Plan", hooks: [cmd("plan-stop.sh")] },
+          ],
+        },
+      },
+    ]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+
+    const stop = ParseCodexHookInput({
+      session_id: "s",
+      cwd: "/",
+      model: "m",
+      hook_event_name: "SubagentStop",
+      agent_type: "Explore",
+      agent_id: "a1",
+      stop_hook_active: false,
+      last_assistant_message: null,
+      permission_mode: "default",
+      transcript_path: null,
+    });
+    expect(stop.success).toBe(true);
+    if (!stop.success) return;
+    expect(
+      resolveMatchingCodexHandlersFromInput(merged.config, stop.data).map(
+        (h) => h.command,
+      ),
+    ).toEqual(["explore-stop.sh"]);
+  });
+
+  test("PreCompact uses trigger as matcher subject", () => {
+    const merged = mergeCodexHooksFiles([
+      {
+        hooks: {
+          PreCompact: [
+            { matcher: "manual", hooks: [cmd("manual-precompact.sh")] },
+            { matcher: "auto", hooks: [cmd("auto-precompact.sh")] },
+          ],
+        },
+      },
+    ]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+
+    const pre = ParseCodexHookInput({
+      session_id: "s",
+      cwd: "/",
+      model: "m",
+      hook_event_name: "PreCompact",
+      trigger: "auto",
+      transcript_path: null,
+    });
+    expect(pre.success).toBe(true);
+    if (!pre.success) return;
+    expect(
+      resolveMatchingCodexHandlersFromInput(merged.config, pre.data).map(
+        (h) => h.command,
+      ),
+    ).toEqual(["auto-precompact.sh"]);
+  });
 });
 
 describe("effectiveCodexHandlerTimeoutSec", () => {

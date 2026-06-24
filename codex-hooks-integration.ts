@@ -149,6 +149,9 @@ export function codexResolutionContextFromInput(
   switch (input.hook_event_name) {
     case "SessionStart":
       return { subject: input.source ?? "" };
+    case "SubagentStart":
+    case "SubagentStop":
+      return { subject: input.agent_type ?? "" };
     case "PreToolUse":
     case "PermissionRequest":
     case "PostToolUse":
@@ -157,6 +160,9 @@ export function codexResolutionContextFromInput(
         toolName: input.tool_name ?? "",
         toolInput: (input.tool_input ?? {}) as Record<string, unknown>,
       };
+    case "PreCompact":
+    case "PostCompact":
+      return { subject: input.trigger ?? "" };
     case "UserPromptSubmit":
       return { subject: "" };
     case "Stop":

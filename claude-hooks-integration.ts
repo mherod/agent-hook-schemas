@@ -184,6 +184,8 @@ function subjectForClaudeInput(input: HookEventInput): string {
       return "";
     case "Notification":
       return i.notification_type as string;
+    case "MessageDisplay":
+      return i.message_text as string;
     case "SubagentStart":
       return i.agent_type as string;
     case "SubagentStop":

@@ -21,6 +21,7 @@ import {
   HookEventNameSchema,
   HookSpecificElicitationOutputSchema,
   HookSpecificElicitationResultOutputSchema,
+  HookSpecificMessageDisplayOutputSchema,
   HookSpecificNotificationOutputSchema,
   HookSpecificPermissionDeniedOutputSchema,
   HookSpecificPreToolUseOutputSchema,
@@ -399,6 +400,78 @@ describe("ParseCodexHookInput", () => {
         transcript_path: "/p.jsonl",
         permission_mode: "auto",
         prompt: "run tests",
+      }).success,
+    ).toBe(false);
+  });
+
+  test("accepts Codex SessionStart source compact (post-compaction restart)", () => {
+    expect(
+      ParseCodexHookInput({
+        ...codexBase,
+        hook_event_name: "SessionStart",
+        source: "compact",
+        permission_mode: "default",
+        transcript_path: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  test("accepts Codex SubagentStart", () => {
+    const r = ParseCodexHookInput({
+      ...codexBase,
+      hook_event_name: "SubagentStart",
+      turn_id: "t1",
+      agent_id: "agent-1",
+      agent_type: "Explore",
+      permission_mode: "default",
+      transcript_path: null,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("accepts Codex SubagentStop with agent transcript + stop guard", () => {
+    const r = ParseCodexHookInput({
+      ...codexBase,
+      hook_event_name: "SubagentStop",
+      turn_id: "t1",
+      agent_id: "agent-1",
+      agent_type: "Explore",
+      agent_transcript_path: null,
+      stop_hook_active: false,
+      last_assistant_message: null,
+      permission_mode: "default",
+      transcript_path: null,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("accepts Codex PreCompact + PostCompact trigger", () => {
+    expect(
+      ParseCodexHookInput({
+        ...codexBase,
+        hook_event_name: "PreCompact",
+        turn_id: "t1",
+        trigger: "manual",
+        transcript_path: null,
+      }).success,
+    ).toBe(true);
+    expect(
+      ParseCodexHookInput({
+        ...codexBase,
+        hook_event_name: "PostCompact",
+        turn_id: "t1",
+        trigger: "auto",
+        transcript_path: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  test("rejects Codex PreCompact unknown trigger", () => {
+    expect(
+      ParseCodexHookInput({
+        ...codexBase,
+        hook_event_name: "PreCompact",
+        trigger: "scheduled",
       }).success,
     ).toBe(false);
   });
@@ -954,6 +1027,35 @@ describe("docs: hook stdin JSON (ParseHookInput)", () => {
       ...claudeBase,
       hook_event_name: "StopFailure",
       error: "rate_limit",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("StopFailure accepts newer error types (overloaded / oauth_org_not_allowed / model_not_found)", () => {
+    for (const error of ["overloaded", "oauth_org_not_allowed", "model_not_found"]) {
+      const r = ParseHookInput({
+        ...claudeBase,
+        hook_event_name: "StopFailure",
+        error,
+      });
+      expect(r.success).toBe(true);
+    }
+  });
+
+  test("StopFailure accepts an unknown future error type (forward-compatible)", () => {
+    const r = ParseHookInput({
+      ...claudeBase,
+      hook_event_name: "StopFailure",
+      error: "some_future_error",
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("MessageDisplay stdin (message_text; displayContent is stdout)", () => {
+    const r = ParseHookInput({
+      ...claudeBase,
+      hook_event_name: "MessageDisplay",
+      message_text: "Here is the plan...",
     });
     expect(r.success).toBe(true);
   });
@@ -1918,6 +2020,34 @@ describe("hooks reference: JSON output (schemas)", () => {
       additionalContext: "My additional context here",
     });
     expect(r.success).toBe(true);
+  });
+
+  test("SessionStart superset fields (initialUserMessage / sessionTitle / watchPaths / reloadSkills)", () => {
+    const r = HookSpecificSessionStartOutputSchema.safeParse({
+      hookEventName: "SessionStart",
+      additionalContext: "context",
+      initialUserMessage: "Resume where we left off",
+      sessionTitle: "Hook schema work",
+      watchPaths: [".env", "src/config.ts"],
+      reloadSkills: true,
+    });
+    expect(r.success).toBe(true);
+  });
+
+  test("MessageDisplay displayContent replaces on-screen text", () => {
+    const r = HookSpecificMessageDisplayOutputSchema.safeParse({
+      hookEventName: "MessageDisplay",
+      displayContent: "[redacted]",
+    });
+    expect(r.success).toBe(true);
+
+    const viaCommand = HookCommandOutputSchema.safeParse({
+      hookSpecificOutput: {
+        hookEventName: "MessageDisplay",
+        displayContent: "[redacted]",
+      },
+    });
+    expect(viaCommand.success).toBe(true);
   });
 
   test("SubagentStart additionalContext", () => {

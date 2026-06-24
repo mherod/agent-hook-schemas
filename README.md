@@ -182,7 +182,7 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 
 | | Claude Code | Codex | Copilot | Gemini CLI | Cursor |
 |---|---|---|---|---|---|
-| **Events** | 26 events | 5 events | 13 events, camelCase or VS-compatible | 11 events | 20 events |
+| **Events** | 30 events | 10 events | 13 events, camelCase or VS-compatible | 11 events | 20 events |
 | **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose; camelCase or `hook_event_name` | Loose (`.loose()`) | Loose (`.loose()`) |
 | **Handler types** | command, http, prompt, agent | command only | command, http, prompt | command only | N/A (stdin-only) |
 | **Matcher** | Regex on subject | Regex on subject | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | N/A |

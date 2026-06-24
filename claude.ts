@@ -71,6 +71,7 @@ export const HookEventNameSchema = z.enum([
   "PostToolBatch",
   "PermissionDenied",
   "Notification",
+  "MessageDisplay",
   "SubagentStart",
   "SubagentStop",
   "TaskCreated",
@@ -164,14 +165,24 @@ export type SessionEndReason = z.infer<typeof SessionEndReasonSchema>;
 
 export const StopFailureErrorSchema = z.enum([
   "rate_limit",
+  "overloaded",
   "authentication_failed",
+  "oauth_org_not_allowed",
   "billing_error",
   "invalid_request",
+  "model_not_found",
   "server_error",
   "max_output_tokens",
   "unknown",
 ]);
 export type StopFailureError = z.infer<typeof StopFailureErrorSchema>;
+
+/**
+ * Forward-compatible version of StopFailureErrorSchema for hook input parsing.
+ * Accepts known error types + any unknown string for future error types so a
+ * new `error_type` value (e.g. a future model error) never fails stdin parsing.
+ */
+export const StopFailureErrorInputSchema = StopFailureErrorSchema.or(z.string());
 
 export const FileWatchEventSchema = z.enum(["change", "add", "unlink"]);
 export type FileWatchEvent = z.infer<typeof FileWatchEventSchema>;
@@ -484,6 +495,16 @@ export const NotificationInputSchema = hookStdinLoose("Notification", {
 });
 export type NotificationInput = z.infer<typeof NotificationInputSchema>;
 
+/**
+ * Fires just before an assistant message renders on screen. Hooks may rewrite
+ * what is displayed via `hookSpecificOutput.displayContent` (transcript stays
+ * unchanged). Default timeout 10s.
+ */
+export const MessageDisplayInputSchema = hookStdinLoose("MessageDisplay", {
+  message_text: z.string().optional(),
+});
+export type MessageDisplayInput = z.infer<typeof MessageDisplayInputSchema>;
+
 export const SubagentStartInputSchema = hookStdinLoose("SubagentStart", {
   agent_id: z.string().optional(),
   agent_type: z.string().optional(),
@@ -520,7 +541,7 @@ export const StopInputSchema = hookStdinLoose("Stop", {
 export type StopInput = z.infer<typeof StopInputSchema>;
 
 export const StopFailureInputSchema = hookStdinLoose("StopFailure", {
-  error: StopFailureErrorSchema.optional(),
+  error: StopFailureErrorInputSchema.optional(),
   error_details: z.string().optional(),
   last_assistant_message: z.string().optional(),
 });
@@ -639,6 +660,7 @@ export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   PostToolUseFailureInputSchema,
   PermissionDeniedInputSchema,
   NotificationInputSchema,
+  MessageDisplayInputSchema,
   SubagentStartInputSchema,
   SubagentStopInputSchema,
   TaskCreatedInputSchema,
@@ -716,7 +738,23 @@ export type HookSpecificPermissionDeniedOutput = z.infer<
   typeof HookSpecificPermissionDeniedOutputSchema
 >;
 
-export const HookSpecificSessionStartOutputSchema = SharedHookSpecificSessionStartOutputSchema;
+/**
+ * Claude SessionStart `hookSpecificOutput`. Superset of the shared Claude ∩ Codex
+ * shape ({@link SharedHookSpecificSessionStartOutputSchema}): adds Claude-only
+ * fields from the hooks reference — `initialUserMessage` (seed the first turn),
+ * `sessionTitle` (set the session title), `watchPaths` (register watched files),
+ * and `reloadSkills` (reload skills after the hook runs).
+ */
+export const HookSpecificSessionStartOutputSchema = z
+  .object({
+    hookEventName: z.literal("SessionStart"),
+    additionalContext: z.string().optional(),
+    initialUserMessage: z.string().optional(),
+    sessionTitle: z.string().optional(),
+    watchPaths: z.array(z.string()).optional(),
+    reloadSkills: OptionalBooleanField,
+  })
+  .strict();
 export type HookSpecificSessionStartOutput = z.infer<typeof HookSpecificSessionStartOutputSchema>;
 
 export const HookSpecificUserPromptSubmitOutputSchema =
@@ -785,6 +823,18 @@ export type HookSpecificPostToolBatchOutput = z.infer<
   typeof HookSpecificPostToolBatchOutputSchema
 >;
 
+/**
+ * MessageDisplay `hookSpecificOutput`. `displayContent` replaces the assistant
+ * text shown on screen only — the stored transcript is left unchanged.
+ */
+export const HookSpecificMessageDisplayOutputSchema = BaseHookSpecificOutputSchema.extend({
+  hookEventName: z.literal("MessageDisplay"),
+  displayContent: z.string().optional(),
+});
+export type HookSpecificMessageDisplayOutput = z.infer<
+  typeof HookSpecificMessageDisplayOutputSchema
+>;
+
 export const HookSpecificOutputSchema = z.union([
   HookSpecificPreToolUseOutputSchema,
   HookSpecificPermissionRequestOutputSchema,
@@ -795,6 +845,7 @@ export const HookSpecificOutputSchema = z.union([
   HookSpecificPostToolUseOutputSchema,
   HookSpecificPostToolBatchOutputSchema,
   HookSpecificPostToolUseFailureOutputSchema,
+  HookSpecificMessageDisplayOutputSchema,
   HookSpecificSubagentStartOutputSchema,
   HookSpecificNotificationOutputSchema,
   HookSpecificElicitationOutputSchema,

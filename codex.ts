@@ -20,17 +20,25 @@ import {
 
 export const CodexHookEventNameSchema = z.enum([
   "SessionStart",
+  "SubagentStart",
   "PreToolUse",
   "PermissionRequest",
   "PostToolUse",
+  "PreCompact",
+  "PostCompact",
   "UserPromptSubmit",
+  "SubagentStop",
   "Stop",
 ]);
 export type CodexHookEventName = z.infer<typeof CodexHookEventNameSchema>;
 
-/** Codex SessionStart `source` (`session-start.command.input`). */
-export const CodexSessionStartSourceSchema = z.enum(["startup", "resume", "clear"]);
+/** Codex SessionStart `source` (`session-start.command.input`). Includes `compact` (post-compaction restart). */
+export const CodexSessionStartSourceSchema = z.enum(["startup", "resume", "clear", "compact"]);
 export type CodexSessionStartSource = z.infer<typeof CodexSessionStartSourceSchema>;
+
+/** Codex PreCompact / PostCompact `trigger` (`manual` or `auto`). */
+export const CodexCompactTriggerSchema = z.enum(["manual", "auto"]);
+export type CodexCompactTrigger = z.infer<typeof CodexCompactTriggerSchema>;
 
 /** Alias for {@link NullableStringSchema} for backward compatibility. */
 export const CodexNullableStringSchema = NullableStringSchema;
@@ -219,13 +227,97 @@ export const CodexStopInputSchema = z
   .loose();
 export type CodexStopInput = z.infer<typeof CodexStopInputSchema>;
 
-/** Discriminated union for Codex command-hook stdin. */
+/**
+ * Codex SubagentStart stdin (`subagent-start.command.input`). Runs at subagent-start
+ * scope; matcher is `agent_type`. Modeled from the public Codex hooks reference
+ * (developers.openai.com/codex/hooks).
+ */
+export const CodexSubagentStartInputSchema = z
+  .object({
+    agent_id: z.string().optional(),
+    agent_type: z.string().optional(),
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("SubagentStart"),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexSubagentStartInput = z.infer<typeof CodexSubagentStartInputSchema>;
+
+/**
+ * Codex PreCompact stdin (`pre-compact.command.input`). Turn-scoped; matcher is
+ * `trigger` (`manual` or `auto`). Modeled from the public Codex hooks reference.
+ */
+export const CodexPreCompactInputSchema = z
+  .object({
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("PreCompact"),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    trigger: CodexCompactTriggerSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexPreCompactInput = z.infer<typeof CodexPreCompactInputSchema>;
+
+/**
+ * Codex PostCompact stdin (`post-compact.command.input`). Turn-scoped; matcher is
+ * `trigger` (`manual` or `auto`). Modeled from the public Codex hooks reference.
+ */
+export const CodexPostCompactInputSchema = z
+  .object({
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("PostCompact"),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    trigger: CodexCompactTriggerSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexPostCompactInput = z.infer<typeof CodexPostCompactInputSchema>;
+
+/**
+ * Codex SubagentStop stdin (`subagent-stop.command.input`). Turn-scoped; matcher is
+ * `agent_type`. Carries the finishing subagent's transcript and last message, plus
+ * `stop_hook_active` to guard against re-entrant stop loops. Modeled from the public
+ * Codex hooks reference.
+ */
+export const CodexSubagentStopInputSchema = z
+  .object({
+    agent_id: z.string().optional(),
+    agent_transcript_path: CodexNullableStringSchema.optional(),
+    agent_type: z.string().optional(),
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("SubagentStop"),
+    last_assistant_message: CodexNullableStringSchema.optional(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    session_id: z.string().optional(),
+    stop_hook_active: OptionalBooleanField,
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexSubagentStopInput = z.infer<typeof CodexSubagentStopInputSchema>;
+
+/** Discriminated union for Codex command-hook stdin (ten events). */
 export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   CodexSessionStartInputSchema,
+  CodexSubagentStartInputSchema,
   CodexPreToolUseInputSchema,
   CodexPermissionRequestInputSchema,
   CodexPostToolUseInputSchema,
+  CodexPreCompactInputSchema,
+  CodexPostCompactInputSchema,
   CodexUserPromptSubmitInputSchema,
+  CodexSubagentStopInputSchema,
   CodexStopInputSchema,
 ]);
 export type CodexHookEventInput = z.infer<typeof CodexHookEventInputSchema>;
@@ -250,10 +342,14 @@ const CodexMatcherGroupListSchema = z.array(CodexMatcherGroupSchema);
 export const CodexHooksConfigSchema = z
   .object({
     SessionStart: CodexMatcherGroupListSchema,
+    SubagentStart: CodexMatcherGroupListSchema,
     PreToolUse: CodexMatcherGroupListSchema,
     PermissionRequest: CodexMatcherGroupListSchema,
     PostToolUse: CodexMatcherGroupListSchema,
+    PreCompact: CodexMatcherGroupListSchema,
+    PostCompact: CodexMatcherGroupListSchema,
     UserPromptSubmit: CodexMatcherGroupListSchema,
+    SubagentStop: CodexMatcherGroupListSchema,
     Stop: CodexMatcherGroupListSchema,
   })
   .partial()
@@ -518,7 +614,42 @@ export type CodexStopCommandOutputWire = z.infer<typeof CodexStopCommandOutputWi
 export const CodexStopStdoutSchema = CodexStopCommandOutputWireSchema;
 export type CodexStopStdout = z.infer<typeof CodexStopStdoutSchema>;
 
-/** Parse Codex command-hook stdin (five events). */
+// ---------------------------------------------------------------------------
+// Reference-derived stdout for events new in the public Codex hooks reference
+// (SubagentStart, PreCompact, PostCompact, SubagentStop). These follow the
+// documented release behavior (developers.openai.com/codex/hooks) rather than a
+// generated `additionalProperties: false` wire schema, so they stay `.loose()`
+// pending transcript-capture verification.
+// ---------------------------------------------------------------------------
+
+/** `subagent-start.command.output`: plain text or `hookSpecificOutput.additionalContext` injects developer context. */
+export const CodexSubagentStartStdoutSchema = SharedHookStdoutCommonFieldsSchema.extend({
+  hookSpecificOutput: z
+    .object({
+      hookEventName: z.literal("SubagentStart"),
+      additionalContext: OptionalStringField,
+    })
+    .loose()
+    .optional(),
+}).loose();
+export type CodexSubagentStartStdout = z.infer<typeof CodexSubagentStartStdoutSchema>;
+
+/** `pre-compact.command.output`: common output fields (`continue` / `stopReason` / `systemMessage` / `suppressOutput`). */
+export const CodexPreCompactStdoutSchema = SharedHookStdoutCommonFieldsSchema.loose();
+export type CodexPreCompactStdout = z.infer<typeof CodexPreCompactStdoutSchema>;
+
+/** `post-compact.command.output`: informational; common output fields only. */
+export const CodexPostCompactStdoutSchema = SharedHookStdoutCommonFieldsSchema.loose();
+export type CodexPostCompactStdout = z.infer<typeof CodexPostCompactStdoutSchema>;
+
+/** `subagent-stop.command.output`: top-level `decision: "block"` + `reason` keeps the subagent running. */
+export const CodexSubagentStopStdoutSchema = SharedHookStdoutCommonFieldsSchema.extend({
+  decision: z.union([CodexBlockDecisionWireSchema, z.null()]).optional(),
+  reason: OptionalStringField,
+}).loose();
+export type CodexSubagentStopStdout = z.infer<typeof CodexSubagentStopStdoutSchema>;
+
+/** Parse Codex command-hook stdin (ten events). */
 export function ParseCodexHookInput(json: unknown) {
   return CodexHookEventInputSchema.safeParse(json);
 }
