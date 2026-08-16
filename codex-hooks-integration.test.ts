@@ -9,7 +9,7 @@ import {
   resolveMatchingCodexHandlers,
   resolveMatchingCodexHandlersFromInput,
 } from "./codex-hooks-integration.ts";
-import { ParseCodexHookInput } from "./index.ts";
+import { CodexCommandHookHandlerSchema, ParseCodexHookInput } from "./index.ts";
 
 const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number; if: string }>) =>
   ({
@@ -470,5 +470,126 @@ describe("parseCodexHooksFile", () => {
   test("allows unknown top-level keys via .loose()", () => {
     const r = parseCodexHooksFile({ hooks: {}, customField: true });
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("CodexCommandHookHandlerSchema & OpenAI contract alignment (#23)", () => {
+  test("parses full official OpenAI command handler fields", () => {
+    const handler = {
+      type: "command" as const,
+      command: "bash check.sh",
+      commandWindows: "powershell.exe -File check.ps1",
+      timeout: 30,
+      async: true,
+      statusMessage: "Running security checks...",
+      additionalContextLimit: 4000,
+    };
+    const r = CodexCommandHookHandlerSchema.safeParse(handler);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.command).toBe("bash check.sh");
+    expect(r.data.commandWindows).toBe("powershell.exe -File check.ps1");
+    expect(r.data.timeout).toBe(30);
+    expect(r.data.async).toBe(true);
+    expect(r.data.statusMessage).toBe("Running security checks...");
+    expect(r.data.additionalContextLimit).toBe(4000);
+  });
+
+  test("additionalContextLimit accepts 0 and positive integers", () => {
+    expect(
+      CodexCommandHookHandlerSchema.safeParse({
+        type: "command",
+        command: "true",
+        additionalContextLimit: 0,
+      }).success,
+    ).toBe(true);
+
+    expect(
+      CodexCommandHookHandlerSchema.safeParse({
+        type: "command",
+        command: "true",
+        additionalContextLimit: 500,
+      }).success,
+    ).toBe(true);
+  });
+
+  test("additionalContextLimit rejects negative numbers and non-integers", () => {
+    expect(
+      CodexCommandHookHandlerSchema.safeParse({
+        type: "command",
+        command: "true",
+        additionalContextLimit: -1,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      CodexCommandHookHandlerSchema.safeParse({
+        type: "command",
+        command: "true",
+        additionalContextLimit: 12.5,
+      }).success,
+    ).toBe(false);
+  });
+
+  test("retains compatibility extensions: timeoutSec, if, once, args, asyncRewake, shell", () => {
+    const r = CodexCommandHookHandlerSchema.safeParse({
+      type: "command",
+      command: "true",
+      timeoutSec: 15,
+      if: "Bash(git *)",
+      once: true,
+      args: ["--quiet"],
+      asyncRewake: false,
+      shell: "bash",
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.timeoutSec).toBe(15);
+    expect(r.data.if).toBe("Bash(git *)");
+    expect(r.data.once).toBe(true);
+    expect(r.data.args).toEqual(["--quiet"]);
+    expect(r.data.asyncRewake).toBe(false);
+    expect(r.data.shell).toBe("bash");
+  });
+
+  test("parseCodexHooksFile and mergeCodexHooksFiles preserve commandWindows and additionalContextLimit", () => {
+    const file = {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "Bash",
+            hooks: [
+              {
+                type: "command",
+                command: "./gate.sh",
+                commandWindows: ".\\gate.ps1",
+                timeout: 20,
+                async: false,
+                statusMessage: "Verifying tool call",
+                additionalContextLimit: 2000,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const parsed = parseCodexHooksFile(file);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    const h = parsed.config.PreToolUse?.[0]?.hooks[0];
+    expect(h?.commandWindows).toBe(".\\gate.ps1");
+    expect(h?.additionalContextLimit).toBe(2000);
+    expect(h?.statusMessage).toBe("Verifying tool call");
+
+    const merged = mergeCodexHooksFiles([file]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+    const resolved = resolveMatchingCodexHandlers(merged.config, "PreToolUse", {
+      subject: "Bash",
+    });
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.commandWindows).toBe(".\\gate.ps1");
+    expect(resolved[0]?.additionalContextLimit).toBe(2000);
+    expect(resolved[0]?.statusMessage).toBe("Verifying tool call");
   });
 });

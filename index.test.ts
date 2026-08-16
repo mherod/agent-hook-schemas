@@ -2234,13 +2234,28 @@ describe("codex docs: hooks.json (CodexHooksFileSchema)", () => {
     expect(r.success).toBe(true);
   });
 
-  test("command handler accepts timeoutSec alias (docs)", () => {
-    const r = CodexCommandHookHandlerSchema.safeParse({
+  test("command handler accepts official OpenAI fields and timeoutSec compat alias", () => {
+    const official = CodexCommandHookHandlerSchema.safeParse({
+      type: "command",
+      command: "true",
+      commandWindows: "powershell.exe -Command True",
+      timeout: 600,
+      async: false,
+      statusMessage: "Running command",
+      additionalContextLimit: 1000,
+    });
+    expect(official.success).toBe(true);
+    if (official.success) {
+      expect(official.data.commandWindows).toBe("powershell.exe -Command True");
+      expect(official.data.additionalContextLimit).toBe(1000);
+    }
+
+    const compat = CodexCommandHookHandlerSchema.safeParse({
       type: "command",
       command: "true",
       timeoutSec: 600,
     });
-    expect(r.success).toBe(true);
+    expect(compat.success).toBe(true);
   });
 
   test("matcher on UserPromptSubmit is stored even when runtime ignores it", () => {

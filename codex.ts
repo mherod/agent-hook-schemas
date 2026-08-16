@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  CommandHookHandlerSchema,
   JsonObjectSchema,
   NullableStringSchema,
   NullableStringDefaultSchema,
@@ -11,6 +10,7 @@ import {
   SharedHookStdoutCommonFieldsSchema,
   createCodexCommandOutputSchema,
   OptionalToolNameField,
+  HookShellSchema,
 } from "./common.ts";
 
 // ---------------------------------------------------------------------------
@@ -323,11 +323,41 @@ export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name",
 export type CodexHookEventInput = z.infer<typeof CodexHookEventInputSchema>;
 
 /**
- * Codex `hooks.json` only documents command handlers; reuse Claude command shape
- * plus `timeoutSec` alias.
+ * Codex command hook handler schema aligned with OpenAI Codex `hooks.json` contract.
+ *
+ * Official OpenAI Codex fields:
+ * - `type`: handler type (`"command"`)
+ * - `command`: command line string to execute
+ * - `commandWindows`: optional Windows-specific command override
+ * - `timeout`: timeout in seconds (default 600s)
+ * - `async`: boolean flag to run handler in the background without blocking
+ * - `statusMessage`: optional message displayed while the handler runs
+ * - `additionalContextLimit`: maximum character count of hook stdout context injected (non-negative integer)
+ *
+ * Compatibility / Library extension fields:
+ * - `timeoutSec`: @deprecated legacy compatibility alias for `timeout`
+ * - `if`: guard expression evaluated by integration helpers (e.g. `Bash(...)`)
+ * - `once`: run-once flag
+ * - `args`: optional array of arguments
+ * - `asyncRewake`: Claude-style async rewake flag
+ * - `shell`: shell execution override
  */
-export const CodexCommandHookHandlerSchema = CommandHookHandlerSchema.extend({
+export const CodexCommandHookHandlerSchema = z.object({
+  type: z.literal("command"),
+  command: z.string(),
+  commandWindows: OptionalStringField,
+  timeout: OptionalNumberField,
+  /** @deprecated Compatibility alias for `timeout`. Use `timeout` instead. */
   timeoutSec: OptionalNumberField,
+  async: OptionalBooleanField,
+  statusMessage: OptionalStringField,
+  additionalContextLimit: z.number().int().nonnegative().optional(),
+  // Library / cross-agent compatibility extensions
+  if: OptionalStringField,
+  once: OptionalBooleanField,
+  args: z.array(z.string()).optional(),
+  asyncRewake: OptionalBooleanField,
+  shell: HookShellSchema.optional(),
 });
 export type CodexCommandHookHandler = z.infer<typeof CodexCommandHookHandlerSchema>;
 
