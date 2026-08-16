@@ -9,7 +9,11 @@ import {
   resolveMatchingCodexHandlers,
   resolveMatchingCodexHandlersFromInput,
 } from "./codex-hooks-integration.ts";
-import { CodexCommandHookHandlerSchema, ParseCodexHookInput } from "./index.ts";
+import {
+  CodexCommandHookHandlerSchema,
+  CodexSessionEndStdoutSchema,
+  ParseCodexHookInput,
+} from "./index.ts";
 
 const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number; if: string }>) =>
   ({
@@ -382,11 +386,61 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
       ),
     ).toEqual(["auto-precompact.sh"]);
   });
+
+  test("SessionEnd uses reason as matcher subject", () => {
+    const merged = mergeCodexHooksFiles([
+      {
+        hooks: {
+          SessionEnd: [
+            { matcher: "other", hooks: [cmd("other-sessionend.sh")] },
+            { matcher: "manual", hooks: [cmd("manual-sessionend.sh")] },
+          ],
+        },
+      },
+    ]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+
+    const end = ParseCodexHookInput({
+      session_id: "s",
+      cwd: "/",
+      model: "m",
+      hook_event_name: "SessionEnd",
+      reason: "other",
+      transcript_path: null,
+      last_assistant_message: "bye",
+    });
+    expect(end.success).toBe(true);
+    if (!end.success) return;
+    expect(
+      resolveMatchingCodexHandlersFromInput(merged.config, end.data).map(
+        (h) => h.command,
+      ),
+    ).toEqual(["other-sessionend.sh"]);
+  });
 });
 
 describe("effectiveCodexHandlerTimeoutSec", () => {
-  test("defaults to 600 when neither field set", () => {
+  test("defaults to 600 when neither field set for default events", () => {
     expect(effectiveCodexHandlerTimeoutSec(cmd("true"))).toBe(600);
+    expect(effectiveCodexHandlerTimeoutSec(cmd("true"), "SessionStart")).toBe(600);
+    expect(effectiveCodexHandlerTimeoutSec(cmd("true"), "PreToolUse")).toBe(600);
+  });
+
+  test("SessionEnd defaults to 1s timeout and caps at 3s max", () => {
+    expect(effectiveCodexHandlerTimeoutSec(cmd("true"), "SessionEnd")).toBe(1);
+    expect(
+      effectiveCodexHandlerTimeoutSec(cmd("true", { timeout: 2 }), "SessionEnd"),
+    ).toBe(2);
+    expect(
+      effectiveCodexHandlerTimeoutSec(cmd("true", { timeout: 5 }), "SessionEnd"),
+    ).toBe(3);
+    expect(
+      effectiveCodexHandlerTimeoutSec(
+        cmd("true", { timeoutSec: 10 }),
+        "SessionEnd",
+      ),
+    ).toBe(3);
   });
 
   test("uses timeoutSec when timeout omitted", () => {
@@ -591,5 +645,73 @@ describe("CodexCommandHookHandlerSchema & OpenAI contract alignment (#23)", () =
     expect(resolved[0]?.commandWindows).toBe(".\\gate.ps1");
     expect(resolved[0]?.additionalContextLimit).toBe(2000);
     expect(resolved[0]?.statusMessage).toBe("Verifying tool call");
+  });
+});
+
+describe("Codex SessionEnd hook support (#24)", () => {
+  test("ParseCodexHookInput accepts documented SessionEnd payload and preserves unknown fields", () => {
+    const payload = {
+      hook_event_name: "SessionEnd",
+      session_id: "sess-123",
+      transcript_path: "/tmp/session.jsonl",
+      cwd: "/workspace",
+      model: "o3-mini",
+      permission_mode: "default",
+      reason: "other",
+      last_assistant_message: "Goodbye!",
+      turn_id: "turn-456",
+      extra_future_field: "pass-through",
+    };
+    const r = ParseCodexHookInput(payload);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.hook_event_name).toBe("SessionEnd");
+    if (r.data.hook_event_name === "SessionEnd") {
+      expect(r.data.session_id).toBe("sess-123");
+      expect(r.data.reason).toBe("other");
+      expect(r.data.last_assistant_message).toBe("Goodbye!");
+      expect((r.data as Record<string, unknown>).extra_future_field).toBe(
+        "pass-through",
+      );
+    }
+  });
+
+  test("SessionEnd stdout schema parses advisory fields and permits loose extensions", () => {
+    const valid = {
+      continue: true,
+      stopReason: "completed",
+      systemMessage: "session cleanup done",
+      suppressOutput: false,
+      extraAdvisoryField: "ignored",
+    };
+    const r = CodexSessionEndStdoutSchema.safeParse(valid);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.continue).toBe(true);
+    expect(r.data.systemMessage).toBe("session cleanup done");
+  });
+
+  test("CodexHooksConfigSchema validates and retains SessionEnd matcher groups", () => {
+    const config = {
+      hooks: {
+        SessionEnd: [
+          {
+            matcher: "other",
+            hooks: [
+              {
+                type: "command" as const,
+                command: "./cleanup.sh",
+                timeout: 2,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const parsed = parseCodexHooksFile(config);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.config.SessionEnd).toHaveLength(1);
+    expect(parsed.config.SessionEnd?.[0]?.hooks[0]?.command).toBe("./cleanup.sh");
   });
 });

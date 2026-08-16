@@ -149,6 +149,8 @@ export function codexResolutionContextFromInput(
   switch (input.hook_event_name) {
     case "SessionStart":
       return { subject: input.source ?? "" };
+    case "SessionEnd":
+      return { subject: input.reason ?? "" };
     case "SubagentStart":
     case "SubagentStop":
       return { subject: input.agent_type ?? "" };
@@ -182,11 +184,21 @@ export function resolveMatchingCodexHandlersFromInput(
   );
 }
 
-/** Effective timeout in seconds: explicit `timeout` wins over `timeoutSec`; default 600. */
+/**
+ * Effective timeout in seconds: explicit `timeout` wins over `timeoutSec`.
+ * For `SessionEnd`: defaults to 1 second and is capped at 3 seconds maximum.
+ * For other events: defaults to 600 seconds.
+ */
 export function effectiveCodexHandlerTimeoutSec(
   handler: Pick<CodexCommandHookHandler, "timeout" | "timeoutSec">,
+  event?: CodexHookEventName,
 ): number {
-  return defaultedTimeoutSec(handler.timeout ?? handler.timeoutSec, 600);
+  const raw = handler.timeout ?? handler.timeoutSec;
+  if (event === "SessionEnd") {
+    if (raw === undefined) return 1;
+    return Math.min(Math.max(raw, 0), 3);
+  }
+  return defaultedTimeoutSec(raw, 600);
 }
 
 // ---------------------------------------------------------------------------

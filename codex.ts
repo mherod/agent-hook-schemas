@@ -20,6 +20,7 @@ import {
 
 export const CodexHookEventNameSchema = z.enum([
   "SessionStart",
+  "SessionEnd",
   "SubagentStart",
   "PreToolUse",
   "PermissionRequest",
@@ -35,6 +36,10 @@ export type CodexHookEventName = z.infer<typeof CodexHookEventNameSchema>;
 /** Codex SessionStart `source` (`session-start.command.input`). Includes `compact` (post-compaction restart). */
 export const CodexSessionStartSourceSchema = z.enum(["startup", "resume", "clear", "compact"]);
 export type CodexSessionStartSource = z.infer<typeof CodexSessionStartSourceSchema>;
+
+/** Codex SessionEnd `reason` (`session-end.command.input`). Filters `reason` (currently `"other"`). */
+export const CodexSessionEndReasonSchema = z.enum(["other"]);
+export type CodexSessionEndReason = z.infer<typeof CodexSessionEndReasonSchema>;
 
 /** Codex PreCompact / PostCompact `trigger` (`manual` or `auto`). */
 export const CodexCompactTriggerSchema = z.enum(["manual", "auto"]);
@@ -307,9 +312,30 @@ export const CodexSubagentStopInputSchema = z
   .loose();
 export type CodexSubagentStopInput = z.infer<typeof CodexSubagentStopInputSchema>;
 
-/** Discriminated union for Codex command-hook stdin (ten events). */
+/**
+ * Codex SessionEnd hook stdin (`session-end.command.input`). Main-thread-only,
+ * synchronous, advisory hook. Matcher filters `reason` (`"other"`). Modeled from
+ * the public Codex hooks reference (developers.openai.com/codex/hooks).
+ */
+export const CodexSessionEndInputSchema = z
+  .object({
+    cwd: z.string().optional(),
+    hook_event_name: z.literal("SessionEnd"),
+    last_assistant_message: CodexNullableStringSchema.optional(),
+    model: z.string().optional(),
+    permission_mode: CodexHookPermissionModeSchema.optional(),
+    reason: CodexSessionEndReasonSchema.optional(),
+    session_id: z.string().optional(),
+    transcript_path: CodexNullableStringSchema.optional(),
+    turn_id: z.string().optional(),
+  })
+  .loose();
+export type CodexSessionEndInput = z.infer<typeof CodexSessionEndInputSchema>;
+
+/** Discriminated union for Codex command-hook stdin (eleven events). */
 export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   CodexSessionStartInputSchema,
+  CodexSessionEndInputSchema,
   CodexSubagentStartInputSchema,
   CodexPreToolUseInputSchema,
   CodexPermissionRequestInputSchema,
@@ -372,6 +398,7 @@ const CodexMatcherGroupListSchema = z.array(CodexMatcherGroupSchema);
 export const CodexHooksConfigSchema = z
   .object({
     SessionStart: CodexMatcherGroupListSchema,
+    SessionEnd: CodexMatcherGroupListSchema,
     SubagentStart: CodexMatcherGroupListSchema,
     PreToolUse: CodexMatcherGroupListSchema,
     PermissionRequest: CodexMatcherGroupListSchema,
@@ -679,7 +706,11 @@ export const CodexSubagentStopStdoutSchema = SharedHookStdoutCommonFieldsSchema.
 }).loose();
 export type CodexSubagentStopStdout = z.infer<typeof CodexSubagentStopStdoutSchema>;
 
-/** Parse Codex command-hook stdin (ten events). */
+/** `session-end.command.output`: advisory, non-steering; common output fields only. */
+export const CodexSessionEndStdoutSchema = SharedHookStdoutCommonFieldsSchema.loose();
+export type CodexSessionEndStdout = z.infer<typeof CodexSessionEndStdoutSchema>;
+
+/** Parse Codex command-hook stdin (eleven events). */
 export function ParseCodexHookInput(json: unknown) {
   return CodexHookEventInputSchema.safeParse(json);
 }
