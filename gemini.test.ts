@@ -2,8 +2,10 @@
 import { describe, expect, test } from "bun:test";
 import {
   type GeminiHookEventName,
+  GeminiCommandHookHandlerSchema,
   GeminiHookSpecificOutputSchema,
   GeminiHooksConfigSchema,
+  GeminiHookStdoutDecisionSchema,
   GeminiMatcherGroupSchema,
   GeminiNotificationInputSchema,
   ParseGeminiHookInput,
@@ -342,5 +344,92 @@ describe("Gemini hooks (stdout)", () => {
       tool_input: { path: "/tmp/x" },
     });
     expect(r.success).toBe(true);
+  });
+
+  test("GeminiHookStdoutDecisionSchema accepts allow, deny, block, and ask (#25)", () => {
+    expect(GeminiHookStdoutDecisionSchema.safeParse("allow").success).toBe(true);
+    expect(GeminiHookStdoutDecisionSchema.safeParse("deny").success).toBe(true);
+    expect(GeminiHookStdoutDecisionSchema.safeParse("block").success).toBe(true);
+    expect(GeminiHookStdoutDecisionSchema.safeParse("ask").success).toBe(true);
+  });
+
+  test("GeminiHookStdoutDecisionSchema rejects declared-but-unimplemented approve (#25)", () => {
+    // approve exists in upstream TypeScript types but has no runtime execution path
+    expect(GeminiHookStdoutDecisionSchema.safeParse("approve").success).toBe(false);
+  });
+
+  test("ParseGeminiHookOutput parses decision ask from runtime evidence (#25)", () => {
+    const r = ParseGeminiHookOutput({
+      decision: "ask",
+      systemMessage: "User confirmation required",
+    });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.decision).toBe("ask");
+    expect(r.data.systemMessage).toBe("User confirmation required");
+  });
+});
+
+describe("Gemini handler env support (#25)", () => {
+  test("GeminiCommandHookHandlerSchema validates and preserves env record", () => {
+    const handler = {
+      type: "command" as const,
+      command: "./check.sh",
+      name: "security-gate",
+      timeout: 10000,
+      env: {
+        CI: "true",
+        NODE_ENV: "test",
+        CUSTOM_FLAG: "1",
+      },
+    };
+    const r = GeminiCommandHookHandlerSchema.safeParse(handler);
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.env).toEqual({
+      CI: "true",
+      NODE_ENV: "test",
+      CUSTOM_FLAG: "1",
+    });
+  });
+
+  test("parseGeminiSettings and mergeGeminiHooksFiles preserve handler env", () => {
+    const layer = {
+      hooks: {
+        BeforeTool: [
+          {
+            matcher: "write_.*",
+            hooks: [
+              {
+                type: "command" as const,
+                command: "security.sh",
+                env: { AUTH_TOKEN: "secret", STAGING: "false" },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const parsed = parseGeminiSettings(layer);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.settings.hooks?.BeforeTool?.[0]?.hooks[0]?.env).toEqual({
+      AUTH_TOKEN: "secret",
+      STAGING: "false",
+    });
+
+    const merged = mergeGeminiHooksFiles([layer]);
+    expect(merged.ok).toBe(true);
+    if (!merged.ok) return;
+    const resolved = resolveMatchingGeminiHandlers(
+      merged.config,
+      "BeforeTool",
+      "write_file",
+    );
+    expect(resolved).toHaveLength(1);
+    expect(resolved[0]?.env).toEqual({
+      AUTH_TOKEN: "secret",
+      STAGING: "false",
+    });
   });
 });

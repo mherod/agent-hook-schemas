@@ -33,6 +33,7 @@ export const GeminiCommandHookHandlerSchema = z.object({
   name: OptionalStringField,
   timeout: OptionalNumberField,
   description: OptionalStringField,
+  env: z.record(z.string(), z.string()).optional(),
 });
 export type GeminiCommandHookHandler = z.infer<typeof GeminiCommandHookHandlerSchema>;
 
@@ -277,17 +278,18 @@ export type GeminiHookEventInput = z.infer<typeof GeminiHookEventInputSchema>;
  * - `"allow"` — permit the action
  * - `"deny"` — reject the action (soft denial, agent may retry)
  * - `"block"` — hard block, terminates the action path
+ * - `"ask"` — prompt user for interactive confirmation (supported in Gemini CLI v0.55.1+ runtime scheduler)
  *
- * **Why 3 values (vs. Claude 4, Codex 3):** Gemini uses a single `decision` field
- * across all hook types (no separate permission vs. block enums like Codex). It omits
- * `ask` because Gemini hooks do not support interactive user prompts — decisions must
- * be fully automated. It omits `defer` because there is no background agent mode.
- * The `block` value replaces Codex's separate {@link CodexBlockDecisionWireSchema}.
+ * **Why 4 values (vs. Claude 4, Codex 3):** Gemini CLI v0.55.1+ runtime scheduler implements
+ * `ask` for interactive user prompts alongside `allow`, `deny`, and alias `block`. It omits
+ * `defer` because there is no background agent mode. `approve` is declared in upstream TypeScript
+ * types but lacks an executed decision path in the runtime scheduler, so it is excluded until
+ * execution support is evidenced.
  *
- * @see PreToolPermissionDecisionSchema — Claude equivalent (adds `ask` and `defer`)
- * @see CodexPreToolUsePermissionDecisionWireSchema — Codex equivalent (uses `ask`, no `block`)
+ * @see PreToolPermissionDecisionSchema — Claude equivalent (adds `defer`)
+ * @see CodexPreToolUsePermissionDecisionWireSchema — Codex equivalent (uses `allow`/`deny`/`ask`)
  */
-export const GeminiHookStdoutDecisionSchema = z.enum(["allow", "deny", "block"]);
+export const GeminiHookStdoutDecisionSchema = z.enum(["allow", "deny", "block", "ask"]);
 export type GeminiHookStdoutDecision = z.infer<typeof GeminiHookStdoutDecisionSchema>;
 
 /**
