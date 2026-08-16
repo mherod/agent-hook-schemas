@@ -99,7 +99,14 @@ export const HookEventNameSchema = z.enum([
 export const HookEventNameInputSchema = HookEventNameSchema.or(z.string());
 export type HookEventName = z.infer<typeof HookEventNameSchema>;
 
-export const SessionStartSourceSchema = z.enum(["startup", "resume", "clear", "compact"]);
+export const SessionStartSourceSchema = z.enum([
+  "startup",
+  "resume",
+  "clear",
+  "compact",
+  "init",
+  "restore",
+]);
 export type SessionStartSource = z.infer<typeof SessionStartSourceSchema>;
 
 /**

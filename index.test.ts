@@ -45,6 +45,7 @@ import {
   PromptHookHandlerSchema,
   PromptHookModelResponseSchema,
   ReadToolInputSchema,
+  SessionStartSourceSchema,
   StopHookGuardShouldSkip,
   ToolInputCommand,
   ToolInputFilePath,
@@ -105,6 +106,28 @@ describe("ParseHookInput", () => {
     if (r.success) {
       expect(r.data.hook_event_name).toBe("SessionStart");
       expect((r.data as Record<string, unknown>).experimental_flag).toBe(true);
+    }
+  });
+
+  test("SessionStartSourceSchema validates all 6 documented sources (#21)", () => {
+    const sources = ["startup", "resume", "clear", "compact", "init", "restore"] as const;
+    for (const s of sources) {
+      expect(SessionStartSourceSchema.safeParse(s).success).toBe(true);
+      const r = ParseHookInput({
+        ...claudeBase,
+        hook_event_name: "SessionStart",
+        source: s,
+        model: "claude-3-7-sonnet-20250219",
+        agent_id: "agent-123",
+        agent_type: "general-purpose",
+      });
+      expect(r.success).toBe(true);
+      if (r.success && r.data.hook_event_name === "SessionStart") {
+        expect(r.data.source).toBe(s);
+        expect(r.data.model).toBe("claude-3-7-sonnet-20250219");
+        expect(r.data.agent_id).toBe("agent-123");
+        expect(r.data.agent_type).toBe("general-purpose");
+      }
     }
   });
 
