@@ -18,6 +18,7 @@ import {
   GlobToolInputSchema,
   GrepToolInputSchema,
   HookCommandOutputSchema,
+  HookCommandOutputSchemaLoose,
   HookEventNameSchema,
   HookSpecificElicitationOutputSchema,
   HookSpecificElicitationResultOutputSchema,
@@ -2082,6 +2083,43 @@ describe("hooks reference: JSON output (schemas)", () => {
       },
     });
     expect(r.success).toBe(true);
+  });
+
+  test("terminalSequence universal output field (#20)", () => {
+    const valid = {
+      terminalSequence: "\u001b]9;Notification\u0007",
+      systemMessage: "Task complete",
+    };
+    const broadParsed = HookCommandOutputSchema.safeParse(valid);
+    expect(broadParsed.success).toBe(true);
+    if (!broadParsed.success) return;
+    expect(broadParsed.data.terminalSequence).toBe("\u001b]9;Notification\u0007");
+
+    const looseParsed = HookCommandOutputSchemaLoose.safeParse(valid);
+    expect(looseParsed.success).toBe(true);
+    if (!looseParsed.success) return;
+    expect(looseParsed.data.terminalSequence).toBe("\u001b]9;Notification\u0007");
+
+    // Rejects non-string values
+    const invalidNumber = { terminalSequence: 12345 };
+    expect(HookCommandOutputSchema.safeParse(invalidNumber).success).toBe(false);
+    expect(HookCommandOutputSchemaLoose.safeParse(invalidNumber).success).toBe(false);
+
+    // Retains loose/passthrough for unknown fields
+    const unknownField = {
+      terminalSequence: "\u001b[2J",
+      futureCustomOutput: { foo: "bar" },
+    };
+    const broadLoose = HookCommandOutputSchema.safeParse(unknownField);
+    expect(broadLoose.success).toBe(true);
+    if (broadLoose.success) {
+      expect((broadLoose.data as Record<string, unknown>).futureCustomOutput).toEqual({ foo: "bar" });
+    }
+    const loosePassthrough = HookCommandOutputSchemaLoose.safeParse(unknownField);
+    expect(loosePassthrough.success).toBe(true);
+    if (loosePassthrough.success) {
+      expect((loosePassthrough.data as Record<string, unknown>).futureCustomOutput).toEqual({ foo: "bar" });
+    }
   });
 });
 

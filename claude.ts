@@ -884,6 +884,7 @@ export const HookCommandOutputSchema = z
     additionalContext: z.string().optional(),
     sessionTitle: z.string().optional(),
     watchPaths: z.array(z.string()).optional(),
+    terminalSequence: z.string().optional(),
     hookSpecificOutput: HookSpecificOutputSchema.optional(),
   })
   .loose();
@@ -1182,6 +1183,7 @@ export const HookCommandOutputSchemaLoose = z.object({
   reason: z.string().optional(),
   continue: OptionalBooleanField,
   systemMessage: z.string().optional(),
+  terminalSequence: z.string().optional(),
 }).passthrough();
 export type HookCommandOutputLoose = z.infer<typeof HookCommandOutputSchemaLoose>;
 
