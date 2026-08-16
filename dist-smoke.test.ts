@@ -31,4 +31,9 @@ describe("dist bundle smoke test", () => {
     const { CopilotHookEventNameSchema } = await import("./dist/copilot.js");
     expect(CopilotHookEventNameSchema.options.length).toBeGreaterThan(0);
   });
+
+  test("AntigravityHookEventNameSchema.options is non-empty at bundle load", async () => {
+    const { AntigravityHookEventNameSchema } = await import("./dist/antigravity.js");
+    expect(AntigravityHookEventNameSchema.options.length).toBeGreaterThan(0);
+  });
 });

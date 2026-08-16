@@ -27,16 +27,20 @@ bunx npm publish --otp=$(op item get "Npmjs" --otp)
 
 ## Architecture
 
-This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across five platforms: **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Gemini CLI**, and **Cursor**.
+This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across six platforms: **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Gemini CLI**, **Cursor**, and **Google Antigravity**.
 
 ### Module layout (each is a separate subpath export via `package.json` `exports` + `tsup.config.ts` entry)
 
+- `antigravity.ts` — Google Antigravity `hooks.json` config, stdin/stdout schemas (5 events, camelCase), `ParseAntigravityHookInput()`
+- `antigravity-hooks-integration.ts` — `mergeAntigravityHooksFiles()`, `resolveMatchingAntigravityHandlers()`, matcher/timeout helpers
 - `claude.ts` — Claude Code event schemas (31 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
 - `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
 - `claude-tasks.ts` — Claude Code task management tool input/response schemas (TaskCreate, TaskUpdate, TaskGet, TaskList, TaskOutput, TaskStop)
 - `codex.ts` — Codex event schemas (11 events), strict wire-format stdout, `mergeCodexHooksFiles()`, resolver
 - `codex-tasks.ts` — Codex `update_plan` argument, function-call envelope, and output schemas
 - `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
+- `copilot.ts` — GitHub Copilot hook schemas (13 events), `CopilotHooksFileSchema`, `ParseCopilotHookInput()`, stdout schemas
+- `copilot-hooks-integration.ts` — `mergeCopilotHooksFiles()`, `resolveMatchingCopilotHandlers()`
 - `gemini.ts` — Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput()`
 - `gemini-hooks-integration.ts` — `mergeGeminiHooksFiles()`, `resolveMatchingGeminiHandlers()`
 - `cursor.ts` — Cursor agent + Tab hooks stdin schemas (20 events, camelCase), helper schemas for edits/ranges, `ParseCursorHookInput()`

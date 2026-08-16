@@ -1,3 +1,5 @@
+export * from "./antigravity.ts";
+export * from "./antigravity-hooks-integration.ts";
 export * from "./claude.ts";
 export * from "./claude-hooks-integration.ts";
 export * from "./claude-tasks.ts";

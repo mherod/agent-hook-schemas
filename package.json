@@ -1,7 +1,7 @@
 {
   "name": "agent-hook-schemas",
   "version": "0.3.1",
-  "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Copilot, Gemini CLI, Cursor).",
+  "description": "Zod schemas and helpers for AI coding assistant hook stdin/stdout and hooks config (Claude Code, Codex, Copilot, Gemini CLI, Cursor, Google Antigravity).",
   "type": "module",
   "sideEffects": false,
   "types": "./dist/index.d.ts",
@@ -10,6 +10,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./antigravity": {
+      "types": "./dist/antigravity.d.ts",
+      "import": "./dist/antigravity.js"
+    },
+    "./antigravity-hooks-integration": {
+      "types": "./dist/antigravity-hooks-integration.d.ts",
+      "import": "./dist/antigravity-hooks-integration.js"
     },
     "./claude": {
       "types": "./dist/claude.d.ts",

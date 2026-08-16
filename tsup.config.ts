@@ -3,6 +3,8 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: [
     "index.ts",
+    "antigravity.ts",
+    "antigravity-hooks-integration.ts",
     "claude.ts",
     "claude-hooks-integration.ts",
     "claude-tasks.ts",

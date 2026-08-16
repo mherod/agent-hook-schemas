@@ -2,7 +2,7 @@
 
 [Zod](https://zod.dev) schemas and helpers for **hook stdin/stdout JSON** and **hooks config merging** across AI coding assistants.
 
-Supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://github.com/openai/codex), GitHub Copilot CLI / cloud agent hooks, [Gemini CLI](https://github.com/google-gemini/gemini-cli), and [Cursor](https://www.cursor.com/).
+Supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://github.com/openai/codex), GitHub Copilot CLI / cloud agent hooks, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://www.cursor.com/), and [Google Antigravity](https://www.antigravity.google).
 
 ## Install
 
@@ -26,7 +26,7 @@ Requires `zod` v4+ as a dependency and `typescript` v5+ as a peer.
 
 ### Parse hook stdin
 
-Every hook receives JSON on stdin. Parse it into a fully-typed, discriminated union in one call:
+Every hook receives JSON on stdin. Parse it into a fully-typed schema in one call:
 
 ```ts
 import { ParseHookInput } from "agent-hook-schemas";           // Claude Code
@@ -34,6 +34,7 @@ import { ParseCodexHookInput } from "agent-hook-schemas/codex"; // OpenAI Codex
 import { ParseCopilotHookInput } from "agent-hook-schemas/copilot"; // GitHub Copilot
 import { ParseGeminiHookInput } from "agent-hook-schemas/gemini"; // Gemini CLI
 import { ParseCursorHookInput } from "agent-hook-schemas/cursor"; // Cursor
+import { ParseAntigravityHookInput } from "agent-hook-schemas/antigravity"; // Google Antigravity
 
 // In a hook script:
 const raw = JSON.parse(await Bun.stdin.text());
@@ -166,7 +167,9 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 
 | Import | Description |
 |--------|-------------|
-| `agent-hook-schemas` | Root barrel — re-exports Claude, Codex, Copilot, Cursor, Gemini, and integration modules |
+| `agent-hook-schemas` | Root barrel — re-exports Claude, Codex, Copilot, Cursor, Gemini, Antigravity, and integration modules |
+| `agent-hook-schemas/antigravity` | Google Antigravity `hooks.json` config, stdin/stdout schemas, `ParseAntigravityHookInput` |
+| `agent-hook-schemas/antigravity-hooks-integration` | `mergeAntigravityHooksFiles`, `resolveMatchingAntigravityHandlers`, matcher/timeout helpers |
 | `agent-hook-schemas/claude` | Claude Code event schemas, tool input parsers, handler types, stdout schemas |
 | `agent-hook-schemas/claude-hooks-integration` | `mergeClaudeHooksFiles`, `resolveMatchingClaudeHandlers`, matcher/if helpers |
 | `agent-hook-schemas/codex` | Codex event schemas, strict wire-format stdout, `mergeCodexHooksFiles`, resolver |
@@ -180,44 +183,44 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 
 ## Key Differences Between Platforms
 
-| | Claude Code | Codex | Copilot | Gemini CLI | Cursor |
-|---|---|---|---|---|---|
-| **Events** | 31 events | 11 events | 13 events, camelCase or VS-compatible | 11 events | 20 events |
-| **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose; camelCase or `hook_event_name` | Loose (`.loose()`) | Loose (`.loose()`) |
-| **Handler types** | command, http, prompt, agent | command only | command, http, prompt | command only | N/A (stdin-only) |
-| **Matcher** | Regex on subject | Regex on subject | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | N/A |
-| **`if` guard** | `Tool(glob)` on tool input | `Bash(glob)` only | No | No | No |
-| **Config merge** | Yes (`disableAllHooks` resets) | Yes (concatenate) | Yes (concatenate; disabled file skipped) | Yes (concatenate) | No |
-| **Stdout strictness** | Loose | Strict (`.strict()`, defaults) | Strict event-specific outputs | Loose | N/A |
-| **Permission modes** | 6 (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`) | 5 (no `auto`) | N/A | N/A | N/A |
-| **Settings schema** | Full (`ClaudeSettingsSchema`) | Hooks only (`CodexHooksFileSchema`) | Hooks file + settings fragment | Minimal (`GeminiSettingsSchema`) | N/A |
-| **Permission rules** | `allow`/`deny` arrays with `Tool(glob)` syntax | No | `permissionRequest` hook output | No | No |
-| **Default timeout** | 600s | 600s (`timeout` or `timeoutSec`) | 30s (`timeoutSec`) | 60,000ms | N/A |
+| | Claude Code | Codex | Copilot | Gemini CLI | Cursor | Google Antigravity |
+|---|---|---|---|---|---|---|
+| **Events** | 31 events | 11 events | 13 events, camelCase or VS-compatible | 11 events | 20 events | 5 events (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`) |
+| **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose; camelCase or `hook_event_name` | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`, camelCase) |
+| **Handler types** | command, http, prompt, agent | command only | command, http, prompt | command only | N/A (stdin-only) | command only |
+| **Matcher** | Regex on subject | Regex on subject | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | N/A | Regex on tool name (tool events) / flat array (invocation/stop) |
+| **`if` guard** | `Tool(glob)` on tool input | `Bash(glob)` only | No | No | No | No |
+| **Config merge** | Yes (`disableAllHooks` resets) | Yes (concatenate) | Yes (concatenate; disabled file skipped) | Yes (concatenate) | No | Yes (named hook specs merge, handler arrays concatenate) |
+| **Stdout strictness** | Loose | Strict (`.strict()`, defaults) | Strict event-specific outputs | Loose | N/A | Loose |
+| **Permission modes** | 6 (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`) | 5 (no `auto`) | N/A | N/A | N/A | N/A (`PreToolUse` decisions: `allow`, `deny`, `ask`, `force_ask`, `deny_unless_prior_grant`) |
+| **Settings schema** | Full (`ClaudeSettingsSchema`) | Hooks only (`CodexHooksFileSchema`) | Hooks file + settings fragment | Minimal (`GeminiSettingsSchema`) | N/A | Hooks file (`AntigravityHooksFileSchema`) |
+| **Permission rules** | `allow`/`deny` arrays with `Tool(glob)` syntax | No | `permissionRequest` hook output | No | No | `permissionOverrides` on `PreToolUse` stdout |
+| **Default timeout** | 600s | 600s (`timeout` or `timeoutSec`) | 30s (`timeoutSec`) | 60,000ms | N/A | 30s (`timeout` in seconds) |
 
 ### Event Name Comparison
 
 Events across platforms that serve equivalent purposes but use different names or casing:
 
-| Concept | Claude Code | Codex | Copilot | Gemini CLI | Cursor |
-|---|---|---|---|---|---|
-| **Session start** | `SessionStart` | `SessionStart` | `sessionStart` / `SessionStart` | `SessionStart` | `sessionStart` |
-| **Session end** | `SessionEnd` | `SessionEnd` | `sessionEnd` / `SessionEnd` | `SessionEnd` | `sessionEnd` |
-| **User prompt** | `UserPromptSubmit` | `UserPromptSubmit` | `userPromptSubmitted` / `UserPromptSubmit` | — | `beforeSubmitPrompt` |
-| **Before tool** | `PreToolUse` | `PreToolUse` | `preToolUse` / `PreToolUse` | `BeforeTool` | `preToolUse` |
-| **After tool** | `PostToolUse` | `PostToolUse` | `postToolUse` / `PostToolUse` | `AfterTool` | `postToolUse` |
-| **Tool failure** | `PostToolUseFailure` | — | `postToolUseFailure` / `PostToolUseFailure` | — | — |
-| **Permission request** | `PermissionRequest` | — | `permissionRequest` / `PermissionRequest` | — | — |
-| **Permission denied** | `PermissionDenied` | — | — | — | — |
-| **Stop / end of turn** | `Stop` | `Stop` | `agentStop` / `Stop` | — | `stop` |
-| **Stop failure** | `StopFailure` | — | — | — | — |
-| **Before agent** | `SubagentStart` | — | `subagentStart` / `SubagentStart` | `BeforeAgent` | — |
-| **After agent** | `SubagentStop` | — | `subagentStop` / `SubagentStop` | `AfterAgent` | `afterAgentResponse` |
-| **Before shell** | — | — | — | — | `beforeShellExecution` |
-| **After shell** | — | — | — | — | `afterShellExecution` |
-| **Before model** | — | — | — | `BeforeModel` | — |
-| **After model** | — | — | — | `AfterModel` | — |
-| **Tool selection** | — | — | — | `BeforeToolSelection` | — |
-| **Notification** | `Notification` | — | `notification` / `Notification` | `Notification` | — |
+| Concept | Claude Code | Codex | Copilot | Gemini CLI | Cursor | Google Antigravity |
+|---|---|---|---|---|---|---|
+| **Session start** | `SessionStart` | `SessionStart` | `sessionStart` / `SessionStart` | `SessionStart` | `sessionStart` | — |
+| **Session end** | `SessionEnd` | `SessionEnd` | `sessionEnd` / `SessionEnd` | `SessionEnd` | `sessionEnd` | — |
+| **User prompt** | `UserPromptSubmit` | `UserPromptSubmit` | `userPromptSubmitted` / `UserPromptSubmit` | — | `beforeSubmitPrompt` | — |
+| **Before tool** | `PreToolUse` | `PreToolUse` | `preToolUse` / `PreToolUse` | `BeforeTool` | `preToolUse` | `PreToolUse` |
+| **After tool** | `PostToolUse` | `PostToolUse` | `postToolUse` / `PostToolUse` | `AfterTool` | `postToolUse` | `PostToolUse` |
+| **Tool failure** | `PostToolUseFailure` | — | `postToolUseFailure` / `PostToolUseFailure` | — | — | (via `PostToolUse` `error` field) |
+| **Permission request** | `PermissionRequest` | — | `permissionRequest` / `PermissionRequest` | — | — | (via `PreToolUse` `decision: "ask"`) |
+| **Permission denied** | `PermissionDenied` | — | — | — | — | — |
+| **Stop / end of turn** | `Stop` | `Stop` | `agentStop` / `Stop` | — | `stop` | `Stop` |
+| **Stop failure** | `StopFailure` | — | — | — | — | (via `Stop` `error` field) |
+| **Before agent** | `SubagentStart` | — | `subagentStart` / `SubagentStart` | `BeforeAgent` | — | — |
+| **After agent** | `SubagentStop` | — | `subagentStop` / `SubagentStop` | `AfterAgent` | `afterAgentResponse` | — |
+| **Before shell** | — | — | — | — | `beforeShellExecution` | — |
+| **After shell** | — | — | — | — | `afterShellExecution` | — |
+| **Before model** | — | — | — | `BeforeModel` | — | `PreInvocation` |
+| **After model** | — | — | — | `AfterModel` | — | `PostInvocation` |
+| **Tool selection** | — | — | — | `BeforeToolSelection` | — | — |
+| **Notification** | `Notification` | — | `notification` / `Notification` | `Notification` | — | — |
 | **Compaction** | `PreCompact` / `PostCompact` | — | `preCompact` / `PreCompact` | `PreCompress` | `preCompact` |
 | **Error** | — | — | `errorOccurred` / `ErrorOccurred` | — | — |
 | **Config change** | `ConfigChange` | — | — | — | — |
