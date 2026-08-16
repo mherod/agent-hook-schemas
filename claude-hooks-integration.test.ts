@@ -393,3 +393,80 @@ describe("parseClaudeSettings", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+describe("DirectoryAdded hook event support (#26)", () => {
+  test("ParseHookInput accepts slash_command and register_repo_root sources", () => {
+    const fromSlash = ParseHookInput({
+      hook_event_name: "DirectoryAdded",
+      directory: "/path/to/extra-dir",
+      source: "slash_command",
+    });
+    expect(fromSlash.success).toBe(true);
+    if (!fromSlash.success) return;
+    expect(fromSlash.data.hook_event_name).toBe("DirectoryAdded");
+    if (fromSlash.data.hook_event_name === "DirectoryAdded") {
+      expect(fromSlash.data.directory).toBe("/path/to/extra-dir");
+      expect(fromSlash.data.source).toBe("slash_command");
+    }
+
+    const fromSdk = ParseHookInput({
+      hook_event_name: "DirectoryAdded",
+      directory: "/path/to/repo-root",
+      source: "register_repo_root",
+    });
+    expect(fromSdk.success).toBe(true);
+  });
+
+  test("accepts forward-compatible unknown sources and unknown payload fields", () => {
+    const unknownSource = ParseHookInput({
+      hook_event_name: "DirectoryAdded",
+      directory: "/path/to/dir",
+      source: "future_custom_source",
+      extra_field: "preserve-me",
+    });
+    expect(unknownSource.success).toBe(true);
+    if (!unknownSource.success) return;
+    if (unknownSource.data.hook_event_name === "DirectoryAdded") {
+      expect(unknownSource.data.source).toBe("future_custom_source");
+      expect((unknownSource.data as Record<string, unknown>).extra_field).toBe(
+        "preserve-me",
+      );
+    }
+  });
+
+  test("resolveMatchingClaudeHandlersFromInput matches matcher against source", () => {
+    const config = {
+      DirectoryAdded: [
+        { matcher: "slash_command", hooks: [cmd("on-slash.sh")] },
+        { matcher: "register_repo_root", hooks: [cmd("on-register.sh")] },
+      ],
+    };
+    const input = ParseHookInput({
+      hook_event_name: "DirectoryAdded",
+      directory: "/path/to/dir",
+      source: "slash_command",
+    });
+    expect(input.success).toBe(true);
+    if (!input.success) return;
+    const handlers = resolveMatchingClaudeHandlersFromInput(config, input.data);
+    expect(handlers).toHaveLength(1);
+    expect((handlers[0] as CommandHookHandler).command).toBe("on-slash.sh");
+  });
+
+  test("parseClaudeSettings accepts DirectoryAdded hook configuration", () => {
+    const settings = {
+      hooks: {
+        DirectoryAdded: [
+          {
+            matcher: "slash_command|register_repo_root",
+            hooks: [cmd("sync-index.sh")],
+          },
+        ],
+      },
+    };
+    const parsed = parseClaudeSettings(settings);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.settings.hooks?.DirectoryAdded).toHaveLength(1);
+  });
+});

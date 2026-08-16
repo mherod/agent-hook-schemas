@@ -31,7 +31,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 
 ### Module layout (each is a separate subpath export via `package.json` `exports` + `tsup.config.ts` entry)
 
-- `claude.ts` — Claude Code event schemas (30 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
+- `claude.ts` — Claude Code event schemas (31 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
 - `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
 - `claude-tasks.ts` — Claude Code task management tool input/response schemas (TaskCreate, TaskUpdate, TaskGet, TaskList, TaskOutput, TaskStop)
 - `codex.ts` — Codex event schemas (11 events), strict wire-format stdout, `mergeCodexHooksFiles()`, resolver

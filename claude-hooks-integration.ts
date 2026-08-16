@@ -209,6 +209,8 @@ function subjectForClaudeInput(input: HookEventInput): string {
       return i.name as string;
     case "WorktreeRemove":
       return i.worktree_path as string;
+    case "DirectoryAdded":
+      return i.source as string;
     case "PreCompact":
     case "PostCompact":
       return i.trigger as string;

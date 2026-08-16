@@ -84,6 +84,7 @@ export const HookEventNameSchema = z.enum([
   "FileChanged",
   "WorktreeCreate",
   "WorktreeRemove",
+  "DirectoryAdded",
   "PreCompact",
   "PostCompact",
   "SessionEnd",
@@ -106,6 +107,15 @@ export type SessionStartSource = z.infer<typeof SessionStartSourceSchema>;
  * Accepts known sources + any unknown string for future source types.
  */
 export const SessionStartSourceInputSchema = SessionStartSourceSchema.or(z.string());
+
+export const DirectoryAddedSourceSchema = z.enum(["slash_command", "register_repo_root"]);
+export type DirectoryAddedSource = z.infer<typeof DirectoryAddedSourceSchema>;
+
+/**
+ * Forward-compatible version of DirectoryAddedSourceSchema for hook input parsing.
+ * Accepts known sources + any unknown string for future source types.
+ */
+export const DirectoryAddedSourceInputSchema = DirectoryAddedSourceSchema.or(z.string());
 
 export const MemoryTypeSchema = z.enum(["User", "Project", "Local", "Managed"]);
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
@@ -581,6 +591,12 @@ export const WorktreeRemoveInputSchema = hookStdinLoose("WorktreeRemove", {
 });
 export type WorktreeRemoveInput = z.infer<typeof WorktreeRemoveInputSchema>;
 
+export const DirectoryAddedInputSchema = hookStdinLoose("DirectoryAdded", {
+  directory: z.string().optional(),
+  source: DirectoryAddedSourceInputSchema.optional(),
+});
+export type DirectoryAddedInput = z.infer<typeof DirectoryAddedInputSchema>;
+
 export const PreCompactInputSchema = hookStdinLoose("PreCompact", {
   trigger: CompactTriggerSchema.optional(),
   custom_instructions: z.string().optional(),
@@ -673,6 +689,7 @@ export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   FileChangedInputSchema,
   WorktreeCreateInputSchema,
   WorktreeRemoveInputSchema,
+  DirectoryAddedInputSchema,
   PreCompactInputSchema,
   PostCompactInputSchema,
   SessionEndInputSchema,
