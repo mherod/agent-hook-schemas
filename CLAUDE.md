@@ -82,34 +82,28 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
   ```
   This applies to all three integration files: `claude-hooks-integration.ts`, `codex-hooks-integration.ts`, `gemini-hooks-integration.ts`.
 
-### Schema Consolidation (Common Patterns)
+### Schema Consolidation & Public `./common` Surface
 
-**Extracted patterns (in `common.ts`):**
-- `NullableStringSchema` — `z.union([z.string(), z.null()])` for fields like `transcript_path`, `last_assistant_message`
-- `ToolCallCoreSchema` — Shared `tool_name` + `tool_input` for Claude and Codex
-- `SharedHookEventNameSchema` — Events present on both Claude and Codex (5 events)
-- `SharedHookSpecificOutputSchema` — Common `hookSpecificOutput` discriminated union
-- `SharedHookStdoutCommonFieldsSchema` — Common stdout fields across platforms
-- `toCrossAgentInputSchema(schema)` — Factory that builds a cross-agent-tolerant variant of a hook input schema. Widens `hook_event_name` to `z.string().optional()` (accepting other agents' event names, e.g., Claude `PreCompact` ↔ Gemini `PreCompress`) and makes all fields optional with `catchall(z.unknown())`. Used by `PreCompactInputCrossAgentSchema` (Claude) and `GeminiPreCompressInputCrossAgentSchema` to support shared downstream dispatch logic that runs payloads from multiple platforms through a single schema. See issues #11/#12.
+**Extracted patterns & public `./common` exports (in `common.ts`):**
+- **Primitives & Input Field Schemas**: `JsonObjectSchema` / `JsonObject`, `NullableStringSchema` / `NullableString`, `NullableStringDefaultSchema` / `NullableStringDefault`, `OptionalStringField` / `OptionalString`, `OptionalNumberField` / `OptionalNumber`, `OptionalBooleanField` / `OptionalBoolean`, `ToolNameSchema` / `ToolName`, `OptionalToolNameField` / `OptionalToolName`.
+- **Cross-Agent Dispatch & Resolution Functions**: `toCrossAgentInputSchema(schema)`, `regexMatcherMatches`, `simpleGlobToRegExp`, `defaultedTimeoutSec`, `parseSchemaResult`, `appendHookEntriesByEvent`, `mergeHookConfigLayers`.
+- **Context & Result Types**: `HookResolutionContext`, `RegexMatcherOptions`, `ParsedSchemaResult`, `MergeHookConfigLayersOptions`.
+- **Shared Event Names, Handler, & Matcher Shapes**: `PreToolPermissionDecisionSchema` / `PreToolPermissionDecision`, `SharedHookEventNameSchema` / `SharedHookEventName`, `ToolCallCoreSchema` / `ToolCallCore`, `HookShellSchema`, `HookHandlerCommonSchema`, `CommandHookHandlerSchema` / `CommandHookHandler`, `SharedCommandMatcherGroupSchema` / `SharedCommandMatcherGroup`.
+- **Shared Hook Output Schemas**: `SharedHookSpecificPreToolUseOutputSchema`, `SharedHookSpecificSessionStartOutputSchema`, `SharedHookSpecificPostToolUseOutputSchema`, `SharedHookSpecificUserPromptSubmitOutputSchema`, `SharedHookSpecificStopOutputSchema`, `SharedHookSpecificOutputSchema` (discriminated union), `createCodexCommandOutputSchema`, `sharedHookSpecificAdditionalContextSchema`, `SharedHookStdoutCommonFieldsSchema`.
+
+**Public Surface & Semver Policy (Issue #18):**
+- `./common` is an exported subpath (`package.json` `exports["./common"]`).
+- All exported schemas, types, and utility functions in `common.ts` are considered intentional public API surface.
+- Downstream packages may import these directly from `agent-hook-schemas/common`.
+- Convenience type aliases (e.g. `OptionalString`, `OptionalNumber`, `OptionalBoolean`, `OptionalToolName`, `NullableString`, `ToolName`, `ToolCallCore`) are intentionally retained for consumers building custom cross-agent validators.
+- **De-export Policy**: Any proposed removal or de-export of convenience types must only be scheduled for a future **MAJOR** version bump. Do not remove or break exported types in patch or minor releases.
+- `CodexNullableStringSchema` in `codex.ts` is retained as a compatibility alias.
 
 **Intentional platform differences (NOT consolidated):**
-- **Input base schemas** differ significantly: Cursor has rich metadata (generation_id, workspace_roots), Codex is minimal, Gemini adds timestamp
-- **Decision enums** vary: Claude uses `["allow", "deny", "ask", "defer"]` for permission decisions; Codex uses `["allow", "deny", "ask"]` for permissions and `["block"]` for blocks; Gemini uses `["allow", "deny", "block"]`
-- **Tool input types** vary: Claude/Cursor use `JsonObjectSchema`, Codex PreToolUse uses `z.string()` for bash command, Gemini uses `JsonObjectSchema`
-- **Event naming conventions** differ: Claude/Codex use PascalCase (SessionStart, PreToolUse), Cursor uses camelCase (sessionStart, preToolUse), Gemini uses PascalCase with longer names
-
-**Future consolidation opportunities:**
-1. **Optional number field pattern** (Issue #6): Extract `z.number().optional()` pattern (20+ instances in cursor.ts token counts, durations, line numbers). Effort: S (1-2 hours).
-2. **Optional boolean field pattern** (Issue #7): Extract `z.boolean().optional()` pattern (30+ instances across claude.ts, cursor.ts, codex.ts). Effort: S (1-2 hours).
-3. **Event handler common fields** (Issue #8): Extract `timeout`, `if`, `once` fields to `HookHandlerCommonFields` in common.ts. Effort: M (half day).
-4. **Gemini schema consolidation** (Issue #9): Analyze gemini.ts for extraction opportunities and document intentional platform-specific patterns. Effort: M (half day).
-5. **Decision enum documentation** (Issue #10): Add in-code comments explaining why decision enums differ across platforms. Effort: XS (<30 minutes).
-6. **Tool-related base schema** (Deferred): `tool_name + tool_input + tool_use_id` could be extracted if more platforms join; currently platform variations (string vs JsonObject) prevent this. Blocked pending platform convergence.
-
-**Backward compatibility:**
-- `CodexNullableStringSchema` is now an alias of `NullableStringSchema` for compatibility
-- Do not remove the alias; it documents the extraction relationship
-- Upstream consumers importing `CodexNullableStringSchema` continue to work
+- **Input base schemas** differ significantly: Cursor has rich metadata (generation_id, workspace_roots), Codex is minimal, Gemini adds timestamp, Antigravity uses camelCase protojson keys.
+- **Decision enums** vary: Claude uses `["allow", "deny", "ask", "defer"]`; Codex uses `["allow", "deny", "ask"]` for permissions and `["block"]` for blocks; Gemini uses `["allow", "deny", "block", "ask"]`; Antigravity PreToolUse uses `["allow", "deny", "ask", "force_ask", "deny_unless_prior_grant"]`.
+- **Tool input types** vary: Claude/Cursor/Gemini use `JsonObjectSchema`, Codex PreToolUse uses `z.string()` for bash command, Antigravity uses `args` object.
+- **Event naming conventions** differ: Claude/Codex use PascalCase (`SessionStart`, `PreToolUse`), Cursor uses camelCase (`sessionStart`, `preToolUse`), Gemini uses PascalCase (`BeforeTool`, `AfterTool`), Antigravity uses PascalCase (`PreToolUse`, `PreInvocation`).
 
 ## Bun Runtime
 
