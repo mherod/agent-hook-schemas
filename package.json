@@ -23,6 +23,10 @@
       "types": "./dist/claude.d.ts",
       "import": "./dist/claude.js"
     },
+    "./claude-agents": {
+      "types": "./dist/claude-agents.d.ts",
+      "import": "./dist/claude-agents.js"
+    },
     "./claude-hooks-integration": {
       "types": "./dist/claude-hooks-integration.d.ts",
       "import": "./dist/claude-hooks-integration.js"
@@ -30,6 +34,10 @@
     "./codex": {
       "types": "./dist/codex.d.ts",
       "import": "./dist/codex.js"
+    },
+    "./codex-agents": {
+      "types": "./dist/codex-agents.d.ts",
+      "import": "./dist/codex-agents.js"
     },
     "./codex-tasks": {
       "types": "./dist/codex-tasks.d.ts",

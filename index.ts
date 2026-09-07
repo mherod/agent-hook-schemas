@@ -4,6 +4,7 @@ export * from "./claude.ts";
 export * from "./claude-hooks-integration.ts";
 export * from "./claude-tasks.ts";
 export * from "./codex.ts";
+export * from "./codex-agents.ts";
 export * from "./codex-hooks-integration.ts";
 export * from "./codex-tasks.ts";
 export * from "./copilot.ts";

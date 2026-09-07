@@ -187,12 +187,21 @@ export const ToolSearchToolResponseSchema = z
   .loose();
 export type ToolSearchToolResponse = z.infer<typeof ToolSearchToolResponseSchema>;
 
+/** Agent SDK 0.3.263 AgentInput, with permissive compatibility fields. */
 export const AgentToolInputSchema = z.object({
   prompt: z.string(),
+  // Keep description optional for compatibility with existing captures.
   description: z.string().optional(),
-  subagent_type: z.string(),
+  subagent_type: z.string().optional(),
   model: z.string().optional(),
-});
+  run_in_background: OptionalBooleanField,
+  name: z.string().optional(),
+  /** Deprecated upstream; retained when parsing older payloads. */
+  team_name: z.string().optional(),
+  /** Deprecated upstream; newer runtimes inherit the parent's permission mode. */
+  mode: z.string().optional(),
+  isolation: z.enum(["worktree", "remote"]).or(z.string()).optional(),
+}).loose();
 export type AgentToolInput = z.infer<typeof AgentToolInputSchema>;
 
 export const AskUserQuestionOptionSchema = z.object({

@@ -37,8 +37,10 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - `claude.ts` — Claude Code event schemas (33 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
 - `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
 - `claude-tasks.ts` — Claude Code task management tool input/response schemas (TaskCreate, TaskUpdate, TaskGet, TaskList, TaskOutput, TaskStop)
+- `claude-agents.ts` — Claude Agent/Task, ListAgents and SendMessage decoded input schemas; unknown messaging protocols and outputs are not modeled
 - `codex.ts` — Codex event schemas (12 events), captured strict stdout and reference-derived loose stdout, command/MCP handlers, `mergeCodexHooksFiles()`, resolver
 - `codex-tasks.ts` — Codex `update_plan` argument, function-call envelope, and output schemas
+- `codex-agents.ts` — source-derived collaboration V1/V2 decoded input and response schemas; keep version-specific names and wait semantics separate
 - `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
 - `copilot.ts` — GitHub Copilot hook schemas (13 events), `CopilotHooksFileSchema`, `ParseCopilotHookInput()`, stdout schemas
 - `copilot-hooks-integration.ts` — `mergeCopilotHooksFiles()`, `resolveMatchingCopilotHandlers()`

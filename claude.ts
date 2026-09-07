@@ -229,27 +229,55 @@ export const PermissionDestinationSchema = z.enum([
 export type PermissionDestination = z.infer<typeof PermissionDestinationSchema>;
 
 /**
- * Built-in Claude Code tool names from the hooks guide. MCP tools use
+ * Built-in Claude Code tool names from the tools reference (2026-09-07).
+ * Availability depends on the version, model, provider and session settings. MCP tools use
  * {@link McpToolNamePattern} instead (`mcp__<server>__<tool>`).
  */
 export const ClaudeCodeBuiltinToolNameSchema = z.enum([
   "Agent",
+  "Artifact",
   "AskUserQuestion",
   "Bash",
+  "CronCreate",
+  "CronDelete",
+  "CronList",
   "Edit",
+  "EndConversation",
+  "EnterPlanMode",
+  "EnterWorktree",
   "ExitPlanMode",
+  "ExitWorktree",
   "Glob",
   "Grep",
+  "ListAgents",
+  "ListMcpResourcesTool",
+  "LSP",
+  "Monitor",
+  "NotebookEdit",
+  "PowerShell",
+  "PushNotification",
   "Read",
+  "ReadMcpResourceTool",
+  "RemoteTrigger",
+  "ReportFindings",
+  "ScheduleWakeup",
+  "SendFeedback",
+  "SendMessage",
+  "SendUserFile",
+  "ShareOnboardingGuide",
+  "Skill",
   "TaskCreate",
   "TaskGet",
   "TaskList",
   "TaskOutput",
   "TaskStop",
   "TaskUpdate",
+  "TodoWrite",
   "ToolSearch",
+  "WaitForMcpServers",
   "WebFetch",
   "WebSearch",
+  "Workflow",
   "Write",
 ]);
 export type ClaudeCodeBuiltinToolName = z.infer<typeof ClaudeCodeBuiltinToolNameSchema>;
@@ -277,6 +305,7 @@ export const PreToolUseBashMatcher = "Bash" as const;
 // ---------------------------------------------------------------------------
 
 export * from "./claude-tool-schemas.ts";
+export * from "./claude-agents.ts";
 import { BashToolInputSchema, EditToolInputSchema, GenericToolInputSchema, WriteToolInputSchema } from "./claude-tool-schemas.ts";
 
 // ---------------------------------------------------------------------------

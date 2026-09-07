@@ -171,8 +171,10 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 | `agent-hook-schemas/antigravity` | Google Antigravity `hooks.json` config, stdin/stdout schemas, `ParseAntigravityHookInput` |
 | `agent-hook-schemas/antigravity-hooks-integration` | `mergeAntigravityHooksFiles`, `resolveMatchingAntigravityHandlers`, matcher/timeout helpers |
 | `agent-hook-schemas/claude` | Claude Code event schemas, tool input parsers, handler types, stdout schemas |
+| `agent-hook-schemas/claude-agents` | Claude `Agent` / legacy `Task`, `ListAgents`, and `SendMessage` input schemas and parsers |
 | `agent-hook-schemas/claude-hooks-integration` | `mergeClaudeHooksFiles`, `resolveMatchingClaudeHandlers`, matcher/if helpers |
 | `agent-hook-schemas/codex` | Codex event schemas, strict wire-format stdout, `mergeCodexHooksFiles`, resolver |
+| `agent-hook-schemas/codex-agents` | Separate Codex collaboration V1 and V2 decoded input and response schemas |
 | `agent-hook-schemas/codex-tasks` | Codex `update_plan` argument, function-call, and output schemas |
 | `agent-hook-schemas/copilot` | GitHub Copilot hook config, stdin/stdout schemas, `mergeCopilotHooksFiles`, resolver |
 | `agent-hook-schemas/copilot-hooks-integration` | `mergeCopilotHooksFiles`, `resolveMatchingCopilotHandlers`, matcher helpers |
@@ -182,6 +184,75 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 | `agent-hook-schemas/common` | Shared shapes where Claude and Codex overlap (import explicitly, not re-exported from root) |
 
 ## Reference updates (September 2026)
+
+### Agent tools
+
+`ClaudeCodeBuiltinToolNameSchema` now recognizes all 45 names in the
+[Claude tools reference](https://code.claude.com/docs/en/tools-reference), checked
+on September 7, 2026. This is a catalog, not a guarantee that every tool is enabled
+in a session. Generic hook parsing still accepts unknown tool names.
+
+`AgentToolInputSchema` follows the optional `subagent_type` and new metadata fields
+in [Agent SDK 0.3.263](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk/v/0.3.263):
+`name`, `run_in_background`, and `isolation`. It preserves deprecated `team_name`
+and `mode`, optional descriptions from older payloads, and future fields and model
+names. `ClaudeAgentToolInputSchema` also accepts the legacy `Task` name.
+
+```ts
+import { ParseClaudeAgentToolInput } from "agent-hook-schemas/claude-agents";
+
+const message = ParseClaudeAgentToolInput({
+  tool_name: "SendMessage",
+  tool_input: { to: "migration", notify_when_idle: true },
+});
+// An idle subscription can omit message. A regular send supplies message.
+```
+
+Claude's [cross-session messaging docs](https://code.claude.com/docs/en/cross-session-messaging)
+describe discovery, text delivery, and idle subscriptions without publishing a
+complete JSON contract. `ListAgentsToolInputSchema` therefore preserves an arbitrary
+object. `SendMessageToolInputSchema` types `to`, `message`, `summary`, and
+`notify_when_idle`; object messages remain opaque JSON. These modules do not model
+Claude discovery or messaging responses. Recipient restrictions and availability
+remain runtime checks.
+
+Codex collaboration schemas are based on the
+[rust-v0.153.4 tool definitions](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/src/tools/handlers/multi_agents_spec.rs).
+Choose the version exposed by your host:
+
+| Contract | V1 | V2 |
+|---|---|---|
+| Spawn | `message` or `items`; optional `fork_context` | Required `task_name` and `message`; optional `fork_turns` |
+| Send | `send_input` with optional `interrupt` | `send_message`; `followup_task` can start a turn |
+| Discovery | No discovery tool in this group | `list_agents` with optional `path_prefix` |
+| Wait | `wait_agent` requires `targets`; returns a status map | `wait_agent` waits on the mailbox; returns a summary |
+| Lifecycle | `resume_agent` uses `id`; `close_agent` uses `target` | `interrupt_agent` retains the agent |
+
+```ts
+import {
+  ParseCodexCollaborationV2ToolInput,
+  ParseCodexCollaborationV2ToolResponse,
+} from "agent-hook-schemas/codex-agents";
+
+const call = ParseCodexCollaborationV2ToolInput({
+  tool_name: "spawn_agent",
+  tool_input: { task_name: "review", message: "Review the parser", fork_turns: "none" },
+});
+const result = ParseCodexCollaborationV2ToolResponse("spawn_agent", {
+  task_name: "/root/review",
+  nickname: null,
+});
+```
+
+These parsers accept decoded payloads with bare tool names. Decode transport JSON
+and separate any namespace before calling them. Inputs stay loose and retain
+unknown fields without translating them between versions; V1 item fields are
+typed without enforcing each item's runtime requirements. The host selects tools,
+model overrides, and timeout limits. V2 message handlers return text (empty on
+success in the tagged [implementation](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs)).
+Existing `update_plan` schemas remain in `codex-tasks`.
+
+### Hook configuration
 
 Cursor now validates configuration and stdout as well as stdin:
 
