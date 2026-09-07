@@ -3,6 +3,7 @@ import {
   CodexHookEventNameSchema,
   CodexHooksFileSchema,
   type CodexCommandHookHandler,
+  type CodexHookHandler,
   type CodexHookEventInput,
   type CodexHookEventName,
   type CodexHooksConfig,
@@ -55,8 +56,8 @@ export const codexMatcherMatches: (matcher: string | undefined, subject: string)
 
 /**
  * Evaluate a handler's `if` guard against a Codex tool call.
- * Codex currently only emits `Bash` tool events, so this checks `Bash(glob)` against
- * `tool_input.command`. Returns `true` when `if` is omitted (no guard).
+ * This library extension checks `Bash(glob)` against `tool_input.command`.
+ * Returns `true` when `if` is omitted (no guard).
  */
 export function codexToolIfMatches(
   toolName: string,
@@ -94,22 +95,22 @@ export type CodexHookResolutionContext = HookResolutionContext;
 
 function codexMatcherIgnoredForEvent(
   event: CodexHookEventName,
-): event is "UserPromptSubmit" | "Stop" {
-  return event === "UserPromptSubmit" || event === "Stop";
+): event is "UserPromptSubmit" | "Stop" | "Interrupt" {
+  return event === "UserPromptSubmit" || event === "Stop" || event === "Interrupt";
 }
 
 function handlerIfPasses(
-  handler: CodexCommandHookHandler,
+  handler: CodexHookHandler,
   ctx: CodexHookResolutionContext,
 ): boolean {
-  const ifRule = handler.if;
+  const ifRule = "if" in handler ? handler.if : undefined;
   if (ifRule === undefined) return true;
   if (ctx.toolName === undefined || ctx.toolInput === undefined) return false;
   return codexToolIfMatches(ctx.toolName, ctx.toolInput, ifRule);
 }
 
 /**
- * Returns all command handlers that would run for this event and subject, in
+ * Returns command and MCP handlers for this event and subject, in
  * merge order then matcher-group order. Codex launches them concurrently; this
  * list is the integration surface for "what runs".
  *
@@ -120,11 +121,11 @@ export function resolveMatchingCodexHandlers(
   config: CodexHooksConfig,
   event: CodexHookEventName,
   ctx: CodexHookResolutionContext,
-): CodexCommandHookHandler[] {
+): CodexHookHandler[] {
   const groups = config[event];
   if (!groups?.length) return [];
 
-  const out: CodexCommandHookHandler[] = [];
+  const out: CodexHookHandler[] = [];
   if (codexMatcherIgnoredForEvent(event)) {
     for (const g of groups) {
       for (const h of g.hooks) {
@@ -134,7 +135,12 @@ export function resolveMatchingCodexHandlers(
     return out;
   }
   for (const g of groups) {
-    if (!codexMatcherMatches(g.matcher, ctx.subject)) continue;
+    const subjects =
+      (event === "PreToolUse" || event === "PermissionRequest" || event === "PostToolUse") &&
+      ctx.subject === "apply_patch"
+        ? [ctx.subject, "Edit", "Write"]
+        : [ctx.subject];
+    if (!subjects.some((subject) => codexMatcherMatches(g.matcher, subject))) continue;
     for (const h of g.hooks) {
       if (handlerIfPasses(h, ctx)) out.push(h);
     }
@@ -160,7 +166,8 @@ export function codexResolutionContextFromInput(
       return {
         subject: input.tool_name ?? "",
         toolName: input.tool_name ?? "",
-        toolInput: (input.tool_input ?? {}) as Record<string, unknown>,
+        toolInput: input.tool_input !== null && typeof input.tool_input === "object" && !Array.isArray(input.tool_input)
+          ? input.tool_input as Record<string, unknown> : undefined,
       };
     case "PreCompact":
     case "PostCompact":
@@ -168,6 +175,7 @@ export function codexResolutionContextFromInput(
     case "UserPromptSubmit":
       return { subject: "" };
     case "Stop":
+    case "Interrupt":
       return { subject: "" };
   }
 }
@@ -176,7 +184,7 @@ export function codexResolutionContextFromInput(
 export function resolveMatchingCodexHandlersFromInput(
   config: CodexHooksConfig,
   input: CodexHookEventInput,
-): CodexCommandHookHandler[] {
+): CodexHookHandler[] {
   return resolveMatchingCodexHandlers(
     config,
     input.hook_event_name,
@@ -187,6 +195,7 @@ export function resolveMatchingCodexHandlersFromInput(
 /**
  * Effective timeout in seconds: explicit `timeout` wins over `timeoutSec`.
  * For `SessionEnd`: defaults to 1 second and is capped at 3 seconds maximum.
+ * For `Interrupt`: defaults to 1 second and is clamped to 1–3 seconds.
  * For other events: defaults to 600 seconds.
  */
 export function effectiveCodexHandlerTimeoutSec(
@@ -194,6 +203,7 @@ export function effectiveCodexHandlerTimeoutSec(
   event?: CodexHookEventName,
 ): number {
   const raw = handler.timeout ?? handler.timeoutSec;
+  if (event === "Interrupt") return Math.min(Math.max(raw ?? 1, 1), 3);
   if (event === "SessionEnd") {
     if (raw === undefined) return 1;
     return Math.min(Math.max(raw, 0), 3);

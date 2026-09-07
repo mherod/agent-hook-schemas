@@ -125,27 +125,36 @@ const CopilotPermissionSensitiveHttpEvents = new Set<string>([
 export const CopilotHookHandlerCommonSchema = z.object({
   matcher: OptionalStringField,
   timeoutSec: OptionalNumberField,
+  timeout: OptionalNumberField,
 });
 export type CopilotHookHandlerCommon = z.infer<typeof CopilotHookHandlerCommonSchema>;
 
 /**
- * Command hook entry. Copilot accepts `bash`, `powershell`, or cross-platform
- * `command`; at least one must be present.
+ * Command hook entry: shell command fields or CLI-only exec/args.
+ * An executable is required and cannot be combined with shell command fields.
  */
 export const CopilotCommandHookHandlerSchema = CopilotHookHandlerCommonSchema.extend({
-  type: z.literal("command"),
+  type: z.literal("command").default("command"),
+  exec: OptionalStringField,
+  args: z.array(z.string()).optional(),
   bash: OptionalStringField,
   command: OptionalStringField,
   cwd: OptionalStringField,
   env: z.record(z.string(), z.string()).optional(),
   powershell: OptionalStringField,
 }).superRefine((data, ctx) => {
-  if (!data.bash && !data.powershell && !data.command) {
+  if (!data.exec && !data.bash && !data.powershell && !data.command) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "one of bash, powershell, or command is required",
+      message: "exec or one of bash, powershell, or command is required",
       path: ["command"],
     });
+  }
+  if (data.exec !== undefined && (data.bash !== undefined || data.powershell !== undefined || data.command !== undefined)) {
+    ctx.addIssue({ code: "custom", message: "exec cannot be combined with shell command fields", path: ["exec"] });
+  }
+  if (data.args !== undefined && data.exec === undefined) {
+    ctx.addIssue({ code: "custom", message: "args requires exec", path: ["args"] });
   }
 });
 export type CopilotCommandHookHandler = z.infer<typeof CopilotCommandHookHandlerSchema>;
@@ -276,6 +285,34 @@ export type CopilotSettingsHooksFragment = z.infer<
 
 export const CopilotSettingsSchema = CopilotSettingsHooksFragmentSchema;
 export type CopilotSettings = CopilotSettingsHooksFragment;
+
+/**
+ * Directory hook files discard invalid items, while inline settings stay strict.
+ * Structural errors still reject the file. Diagnostics retain the discarded item paths.
+ */
+export function parseCopilotHooksDirectoryFile(json: unknown):
+  | { ok: true; file: CopilotHooksFile; diagnostics: { event: string; index: number; error: z.ZodError }[] }
+  | { ok: false; error: z.ZodError } {
+  const structural = z.object({
+    version: z.literal(1),
+    disableAllHooks: OptionalBooleanField,
+    hooks: z.record(z.string(), z.array(z.unknown())),
+  }).loose().safeParse(json);
+  if (!structural.success) return { ok: false, error: structural.error };
+  const hooks: CopilotHooksConfig = {};
+  const diagnostics: { event: string; index: number; error: z.ZodError }[] = [];
+  for (const event of CopilotHookEventNames) {
+    const items = structural.data.hooks[event];
+    if (!items) continue;
+    hooks[event] = [];
+    for (const [index, item] of items.entries()) {
+      const parsed = CopilotHooksConfigSchema.safeParse({ [event]: [item] });
+      if (parsed.success) hooks[event]!.push(...parsed.data[event]!);
+      else diagnostics.push({ event, index, error: parsed.error });
+    }
+  }
+  return { ok: true, file: { ...structural.data, hooks }, diagnostics };
+}
 
 // ---------------------------------------------------------------------------
 // Hook stdin: camelCase format
@@ -683,7 +720,25 @@ export type CopilotPostToolUseFailureStdout = CopilotAdditionalContextStdout;
 export const CopilotSubagentStartStdoutSchema = CopilotAdditionalContextStdoutSchema;
 export type CopilotSubagentStartStdout = CopilotAdditionalContextStdout;
 
+export const CopilotPostToolUseStdoutSchema = z.object({
+  modifiedResult: z.object({
+    resultType: z.literal("success"),
+    textResultForLlm: z.string(),
+  }).strict().optional(),
+  additionalContext: OptionalStringField,
+}).strict();
+export type CopilotPostToolUseStdout = z.infer<typeof CopilotPostToolUseStdoutSchema>;
+
+/** Display-only lines, distinct from the final decision JSON. */
+export const CopilotHookProgressSchema = z.object({
+  type: z.literal("progress"),
+  message: z.string(),
+  temporary: z.boolean().optional(),
+}).loose();
+export type CopilotHookProgress = z.infer<typeof CopilotHookProgressSchema>;
+
 export const CopilotHookOutputSchema = z.union([
+  CopilotPostToolUseStdoutSchema,
   CopilotPreToolUseStdoutSchema,
   CopilotAgentStopStdoutSchema,
   CopilotPermissionRequestStdoutSchema,
@@ -701,6 +756,26 @@ export function ParseCopilotHookOutput(json: unknown) {
   return CopilotHookOutputSchema.safeParse(json);
 }
 
+/** Remove single-line progress objects, then parse one final JSON document. */
+export function parseCopilotHookStdout(stdout: string): {
+  progress: CopilotHookProgress[];
+  result: ReturnType<typeof ParseCopilotHookOutput> | undefined;
+} {
+  const progress: CopilotHookProgress[] = [];
+  const remaining = stdout.split(/\r?\n/).filter((line) => {
+    try {
+      const value = JSON.parse(line);
+      if (value?.type !== "progress") return true;
+      const parsed = CopilotHookProgressSchema.safeParse(value);
+      if (parsed.success) progress.push(parsed.data);
+      return false;
+    } catch { return true; }
+  }).join("\n").trim();
+  if (!remaining) return { progress, result: undefined };
+  try { return { progress, result: ParseCopilotHookOutput(JSON.parse(remaining)) }; }
+  catch { return { progress, result: undefined }; }
+}
+
 // ---------------------------------------------------------------------------
 // Config merge + handler resolution -- see copilot-hooks-integration.ts
 // Re-exported here for convenience.
@@ -709,9 +784,11 @@ export function ParseCopilotHookOutput(json: unknown) {
 export {
   copilotEventNameFromInput,
   copilotMatcherMatches,
+  copilotHttpHookUrlAllowed,
   copilotResolutionSubjectFromInput,
   effectiveCopilotHandlerTimeoutSec,
   mergeCopilotHooksFiles,
+  mergeCopilotHooksDirectoryFiles,
   parseCopilotHooksFile,
   resolveMatchingCopilotHandlers,
   resolveMatchingCopilotHandlersFromInput,

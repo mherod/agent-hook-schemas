@@ -30,6 +30,7 @@ export const CodexHookEventNameSchema = z.enum([
   "UserPromptSubmit",
   "SubagentStop",
   "Stop",
+  "Interrupt",
 ]);
 export type CodexHookEventName = z.infer<typeof CodexHookEventNameSchema>;
 
@@ -67,10 +68,14 @@ export type CodexHookInputBase = z.infer<typeof CodexHookInputBaseSchema>;
 export const CodexPreToolUseBashToolInputSchema = z
   .object({
     command: z.string().optional(),
-    description: z.string().optional(),
+    description: z.string().nullable().optional(),
   })
   .loose();
 export type CodexPreToolUseBashToolInput = z.infer<typeof CodexPreToolUseBashToolInputSchema>;
+
+/** Tool inputs also cover apply_patch, MCP arguments, and other local functions. */
+export const CodexToolInputSchema = z.json();
+export type CodexToolInput = z.infer<typeof CodexToolInputSchema>;
 
 /**
  * `permission_mode` on Codex hook stdin (SessionStart, Stop, PreToolUse, UserPromptSubmit, …). Excludes Claude-only `auto`
@@ -104,8 +109,8 @@ export const CodexSessionStartInputSchema = z
 export type CodexSessionStartInput = z.infer<typeof CodexSessionStartInputSchema>;
 
 /**
- * Codex PreToolUse stdin for Bash (`pre-tool-use.command.input`): strict object, no extra keys.
- * Codex currently emits Bash only for this hook; matchers for other tools are forward-looking.
+ * Codex PreToolUse stdin: captured Bash fields plus the documented general JSON
+ * input contract for apply_patch, MCP and other local function tools.
  */
 export const CodexPreToolUseInputSchema = z
   .object({
@@ -114,7 +119,7 @@ export const CodexPreToolUseInputSchema = z
     model: z.string().optional(),
     permission_mode: CodexHookPermissionModeSchema.optional(),
     session_id: z.string().optional(),
-    tool_input: CodexPreToolUseBashToolInputSchema.optional(),
+    tool_input: CodexToolInputSchema.optional(),
     tool_name: OptionalToolNameField,
     tool_use_id: z.string().optional(),
     transcript_path: CodexNullableStringSchema.optional(),
@@ -138,8 +143,7 @@ export const CodexPermissionRequestDescriptionSchema = CodexNullableStringSchema
 export type CodexPermissionRequestDescription = z.infer<typeof CodexPermissionRequestDescriptionSchema>;
 
 /**
- * PermissionRequest `tool_input` (same shape as PreToolUse Bash).
- * Contains the command that requires approval.
+ * Compatibility helper for Bash-shaped PermissionRequest tool inputs.
  */
 export const CodexPermissionRequestBashToolInputSchema = CodexPreToolUseBashToolInputSchema;
 export type CodexPermissionRequestBashToolInput = z.infer<typeof CodexPermissionRequestBashToolInputSchema>;
@@ -162,7 +166,7 @@ export const CodexPermissionRequestInputSchema = z
       .optional(),
     permission_mode: CodexHookPermissionModeSchema.optional(),
     session_id: z.string().optional(),
-    tool_input: CodexPermissionRequestBashToolInputSchema.optional(),
+    tool_input: CodexToolInputSchema.optional(),
     tool_name: OptionalToolNameField,
     transcript_path: CodexNullableStringSchema.optional(),
     turn_id: z.string().optional(),
@@ -171,8 +175,8 @@ export const CodexPermissionRequestInputSchema = z
 export type CodexPermissionRequestInput = z.infer<typeof CodexPermissionRequestInputSchema>;
 
 /**
- * Codex PostToolUse stdin for Bash (`post-tool-use.command.input`): strict object, no extra keys.
- * `tool_response` is required; the official JSON Schema uses `true` (accept any JSON value).
+ * Codex PostToolUse stdin: tool input and response support arbitrary JSON.
+ * Fields remain optional for resilient parsing of partial captures.
  */
 export const CodexPostToolUseInputSchema = z
   .object({
@@ -181,7 +185,7 @@ export const CodexPostToolUseInputSchema = z
     model: z.string().optional(),
     permission_mode: CodexHookPermissionModeSchema.optional(),
     session_id: z.string().optional(),
-    tool_input: CodexPostToolUseBashToolInputSchema.optional(),
+    tool_input: CodexToolInputSchema.optional(),
     tool_name: OptionalToolNameField,
     tool_response: z.unknown().optional(),
     tool_use_id: z.string().optional(),
@@ -332,7 +336,15 @@ export const CodexSessionEndInputSchema = z
   .loose();
 export type CodexSessionEndInput = z.infer<typeof CodexSessionEndInputSchema>;
 
-/** Discriminated union for Codex command-hook stdin (eleven events). */
+/** Main-thread interruption; modeled from release docs rather than a strict capture. */
+export const CodexInterruptInputSchema = CodexHookInputBaseSchema.extend({
+  hook_event_name: z.literal("Interrupt"),
+  turn_id: OptionalStringField,
+  permission_mode: CodexHookPermissionModeSchema.optional(),
+}).loose();
+export type CodexInterruptInput = z.infer<typeof CodexInterruptInputSchema>;
+
+/** Discriminated union for Codex hook stdin (twelve events). */
 export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   CodexSessionStartInputSchema,
   CodexSessionEndInputSchema,
@@ -345,6 +357,7 @@ export const CodexHookEventInputSchema = z.discriminatedUnion("hook_event_name",
   CodexUserPromptSubmitInputSchema,
   CodexSubagentStopInputSchema,
   CodexStopInputSchema,
+  CodexInterruptInputSchema,
 ]);
 export type CodexHookEventInput = z.infer<typeof CodexHookEventInputSchema>;
 
@@ -387,8 +400,25 @@ export const CodexCommandHookHandlerSchema = z.object({
 });
 export type CodexCommandHookHandler = z.infer<typeof CodexCommandHookHandlerSchema>;
 
+/** Synchronous MCP hooks use an existing connection; SessionEnd does not support them. */
+export const CodexMcpToolHookHandlerSchema = z.object({
+  type: z.literal("mcp_tool"),
+  server: z.string(),
+  tool: z.string(),
+  input: JsonObjectSchema.optional(),
+  timeout: OptionalNumberField,
+  statusMessage: OptionalStringField,
+});
+export type CodexMcpToolHookHandler = z.infer<typeof CodexMcpToolHookHandlerSchema>;
+
+export const CodexHookHandlerSchema = z.discriminatedUnion("type", [
+  CodexCommandHookHandlerSchema,
+  CodexMcpToolHookHandlerSchema,
+]);
+export type CodexHookHandler = z.infer<typeof CodexHookHandlerSchema>;
+
 export const CodexMatcherGroupSchema = SharedCommandMatcherGroupSchema.extend({
-  hooks: z.array(CodexCommandHookHandlerSchema),
+  hooks: z.array(CodexHookHandlerSchema),
 });
 export type CodexMatcherGroup = z.infer<typeof CodexMatcherGroupSchema>;
 
@@ -408,11 +438,18 @@ export const CodexHooksConfigSchema = z
     UserPromptSubmit: CodexMatcherGroupListSchema,
     SubagentStop: CodexMatcherGroupListSchema,
     Stop: CodexMatcherGroupListSchema,
+    Interrupt: CodexMatcherGroupListSchema,
   })
   .partial()
   .extend({
     managed_dir: z.string().optional(),
     windows_managed_dir: z.string().optional(),
+  }).superRefine((config, ctx) => {
+    for (const [groupIndex, group] of (config.SessionEnd ?? []).entries()) {
+      for (const [index, handler] of group.hooks.entries()) {
+        if (handler.type === "mcp_tool") ctx.addIssue({ code: "custom", message: "SessionEnd does not support MCP tool hooks", path: ["SessionEnd", groupIndex, "hooks", index, "type"] });
+      }
+    }
   });
 export type CodexHooksConfig = z.infer<typeof CodexHooksConfigSchema>;
 
@@ -710,7 +747,13 @@ export type CodexSubagentStopStdout = z.infer<typeof CodexSubagentStopStdoutSche
 export const CodexSessionEndStdoutSchema = SharedHookStdoutCommonFieldsSchema.loose();
 export type CodexSessionEndStdout = z.infer<typeof CodexSessionEndStdoutSchema>;
 
-/** Parse Codex command-hook stdin (eleven events). */
+/** Advisory only: output cannot prevent an interruption or start another turn. */
+export const CodexInterruptStdoutSchema = z.object({
+  systemMessage: OptionalStringField,
+}).loose();
+export type CodexInterruptStdout = z.infer<typeof CodexInterruptStdoutSchema>;
+
+/** Parse Codex hook stdin (twelve events). */
 export function ParseCodexHookInput(json: unknown) {
   return CodexHookEventInputSchema.safeParse(json);
 }

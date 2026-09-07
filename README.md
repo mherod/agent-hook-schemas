@@ -178,24 +178,70 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 | `agent-hook-schemas/copilot-hooks-integration` | `mergeCopilotHooksFiles`, `resolveMatchingCopilotHandlers`, matcher helpers |
 | `agent-hook-schemas/gemini` | Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput` |
 | `agent-hook-schemas/gemini-hooks-integration` | `mergeGeminiHooksFiles`, `resolveMatchingGeminiHandlers`, timeout helpers |
-| `agent-hook-schemas/cursor` | Cursor agent hooks stdin schemas (camelCase events), `ParseCursorHookInput` |
+| `agent-hook-schemas/cursor` | Cursor stdin, config and event-specific stdout schemas; `ParseCursorHookInput`, `ParseCursorHooksFile`, `ParseCursorHookOutput` |
 | `agent-hook-schemas/common` | Shared shapes where Claude and Codex overlap (import explicitly, not re-exported from root) |
+
+## Reference updates (September 2026)
+
+Cursor now validates configuration and stdout as well as stdin:
+
+```ts
+import { ParseCursorHooksFile, ParseCursorHookOutput } from "agent-hook-schemas/cursor";
+
+const hooks = ParseCursorHooksFile({
+  version: 1,
+  hooks: { stop: [{ command: "bun check.ts", loop_limit: null }] },
+});
+const result = ParseCursorHookOutput("postToolUse", {
+  additional_context: "The generated files passed validation.",
+});
+```
+
+`CursorCloudHooksFileSchema` checks command-only configuration. Event availability is
+separate: hosted cloud agents omit session, MCP-specific, Tab and workspace hooks;
+self-hosted workers also support session start/end. Cursor matcher schemas follow the
+reference's string examples; no object matcher format is defined there.
+
+Copilot's `parseCopilotHooksDirectoryFile` and `mergeCopilotHooksDirectoryFiles` retain
+valid siblings and return diagnostics for invalid items. Existing `CopilotHooksFileSchema`,
+settings schemas and `mergeCopilotHooksFiles` remain strict validators. Use
+`parseCopilotHookStdout` to separate progress lines from the final JSON result, and
+`copilotHttpHookUrlAllowed(url, allowLocalhost)` to check runtime transport policy.
+The latter does not replace event-specific HTTPS validation or cloud firewall rules.
+
+Claude and Codex support `mcp_tool` handlers. Claude adds model-switch inputs and outputs;
+Codex adds the advisory `Interrupt` event. Supply the event to timeout helpers for lifecycle
+defaults. Claude represents `async: true` command timeouts as `Infinity`; `asyncRewake`
+still enforces timeouts. For `SessionEnd`, compute the shared budget with
+`effectiveClaudeSessionEndBudgetSec(settingsHandlers)` and pass it as the timeout helper's
+third argument. Plugin timeouts do not raise that budget; callers can pass an explicit
+environment override in seconds. Bash `if` selection runs hooks when shell syntax is
+uncertain; settings permission evaluation keeps its separate matching behavior.
+Gemini exports `GeminiLlmRequestSchema` and `GeminiLlmResponseSchema` for the stable model
+API, including partial output overrides. Antigravity post-tool inputs type `toolCall`.
+
+References: [Claude](https://code.claude.com/docs/en/hooks),
+[Codex](https://developers.openai.com/codex/hooks),
+[Copilot](https://docs.github.com/en/copilot/reference/hooks-reference),
+[Cursor](https://cursor.com/docs/hooks),
+[Gemini](https://geminicli.com/docs/hooks/reference/),
+[Antigravity](https://antigravity.google/docs/hooks).
 
 ## Key Differences Between Platforms
 
 | | Claude Code | Codex | Copilot | Gemini CLI | Cursor | Google Antigravity |
 |---|---|---|---|---|---|---|
-| **Events** | 31 events | 11 events | 13 events, camelCase or VS-compatible | 11 events | 20 events | 5 events (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`) |
+| **Events** | 33 events | 12 events | 13 events, camelCase or VS-compatible | 11 events | 21 events | 5 events (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`) |
 | **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose; camelCase or `hook_event_name` | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`, camelCase) |
-| **Handler types** | command, http, prompt, agent | command only | command, http, prompt | command only | N/A (stdin-only) | command only |
-| **Matcher** | Regex on subject | Regex on subject | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | N/A | Regex on tool name (tool events) / flat array (invocation/stop) |
+| **Handler types** | command, http, mcp_tool, prompt, agent | command, mcp_tool | command (shell or exec), http, prompt | command only | command, prompt (cloud: command only) | command only |
+| **Matcher** | Exact names/lists or regex; event-aware | Regex on subject and tool aliases | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | String matcher in config | Regex on tool name (tool events) / flat array (invocation/stop) |
 | **`if` guard** | `Tool(glob)` on tool input | `Bash(glob)` only | No | No | No | No |
 | **Config merge** | Yes (`disableAllHooks` resets) | Yes (concatenate) | Yes (concatenate; disabled file skipped) | Yes (concatenate) | No | Yes (named hook specs merge, handler arrays concatenate) |
-| **Stdout strictness** | Loose | Strict (`.strict()`, defaults) | Strict event-specific outputs | Loose | N/A | Loose |
+| **Stdout strictness** | Broad output loose; selected event outputs strict | Captured wires strict; reference-derived events loose | Strict event-specific outputs | Loose | Strict event-specific outputs | Loose |
 | **Permission modes** | 6 (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`) | 5 (no `auto`) | N/A | N/A | N/A | N/A (`PreToolUse` decisions: `allow`, `deny`, `ask`, `force_ask`, `deny_unless_prior_grant`) |
-| **Settings schema** | Full (`ClaudeSettingsSchema`) | Hooks only (`CodexHooksFileSchema`) | Hooks file + settings fragment | Minimal (`GeminiSettingsSchema`) | N/A | Hooks file (`AntigravityHooksFileSchema`) |
+| **Settings schema** | Full (`ClaudeSettingsSchema`) | Hooks only (`CodexHooksFileSchema`) | Hooks file + settings fragment | Minimal (`GeminiSettingsSchema`) | Hooks file (`CursorHooksFileSchema`) | Hooks file (`AntigravityHooksFileSchema`) |
 | **Permission rules** | `allow`/`deny` arrays with `Tool(glob)` syntax | No | `permissionRequest` hook output | No | No | `permissionOverrides` on `PreToolUse` stdout |
-| **Default timeout** | 600s | 600s (`timeout` or `timeoutSec`) | 30s (`timeoutSec`) | 60,000ms | N/A | 30s (`timeout` in seconds) |
+| **Default timeout** | Event/type-aware: usually 600s; prompt 30s, agent 60s | Usually 600s; SessionEnd/Interrupt 1s, max 3s | 30s (`timeoutSec` takes precedence over `timeout`) | 60,000ms | Platform default; config uses seconds | 30s (`timeout` in seconds) |
 
 ### Event Name Comparison
 
@@ -208,29 +254,34 @@ Events across platforms that serve equivalent purposes but use different names o
 | **User prompt** | `UserPromptSubmit` | `UserPromptSubmit` | `userPromptSubmitted` / `UserPromptSubmit` | — | `beforeSubmitPrompt` | — |
 | **Before tool** | `PreToolUse` | `PreToolUse` | `preToolUse` / `PreToolUse` | `BeforeTool` | `preToolUse` | `PreToolUse` |
 | **After tool** | `PostToolUse` | `PostToolUse` | `postToolUse` / `PostToolUse` | `AfterTool` | `postToolUse` | `PostToolUse` |
-| **Tool failure** | `PostToolUseFailure` | — | `postToolUseFailure` / `PostToolUseFailure` | — | — | (via `PostToolUse` `error` field) |
-| **Permission request** | `PermissionRequest` | — | `permissionRequest` / `PermissionRequest` | — | — | (via `PreToolUse` `decision: "ask"`) |
+| **Tool failure** | `PostToolUseFailure` | — | `postToolUseFailure` / `PostToolUseFailure` | — | `postToolUseFailure` | (via `PostToolUse` `error` field) |
+| **Permission request** | `PermissionRequest` | `PermissionRequest` | `permissionRequest` / `PermissionRequest` | — | — | (via `PreToolUse` `decision: "ask"`) |
 | **Permission denied** | `PermissionDenied` | — | — | — | — | — |
 | **Stop / end of turn** | `Stop` | `Stop` | `agentStop` / `Stop` | — | `stop` | `Stop` |
 | **Stop failure** | `StopFailure` | — | — | — | — | (via `Stop` `error` field) |
-| **Before agent** | `SubagentStart` | — | `subagentStart` / `SubagentStart` | `BeforeAgent` | — | — |
-| **After agent** | `SubagentStop` | — | `subagentStop` / `SubagentStop` | `AfterAgent` | `afterAgentResponse` | — |
+| **Subagent start** | `SubagentStart` | `SubagentStart` | `subagentStart` / `SubagentStart` | — | `subagentStart` | — |
+| **Subagent stop** | `SubagentStop` | `SubagentStop` | `subagentStop` / `SubagentStop` | — | `subagentStop` | — |
+| **Before agent turn** | — | — | — | `BeforeAgent` | — | — |
+| **After agent turn** | — | — | — | `AfterAgent` | `afterAgentResponse` (message completion) | — |
 | **Before shell** | — | — | — | — | `beforeShellExecution` | — |
 | **After shell** | — | — | — | — | `afterShellExecution` | — |
 | **Before model** | — | — | — | `BeforeModel` | — | `PreInvocation` |
 | **After model** | — | — | — | `AfterModel` | — | `PostInvocation` |
 | **Tool selection** | — | — | — | `BeforeToolSelection` | — | — |
 | **Notification** | `Notification` | — | `notification` / `Notification` | `Notification` | — | — |
-| **Compaction** | `PreCompact` / `PostCompact` | — | `preCompact` / `PreCompact` | `PreCompress` | `preCompact` |
-| **Error** | — | — | `errorOccurred` / `ErrorOccurred` | — | — |
-| **Config change** | `ConfigChange` | — | — | — | — |
-| **File change** | `FileChanged` | — | — | — | — |
-| **Worktree** | `WorktreeCreate` / `WorktreeRemove` | — | — | — | — |
-| **Task lifecycle** | `TaskCreated` / `TaskCompleted` | — | — | — | — |
-| **Elicitation** | `Elicitation` / `ElicitationResult` | — | — | — | — |
-| **Instructions** | `InstructionsLoaded` | — | — | — | — |
-| **Teammate** | `TeammateIdle` | — | — | — | — |
-| **CWD change** | `CwdChanged` | — | — | — | — |
+| **Compaction** | `PreCompact` / `PostCompact` | `PreCompact` / `PostCompact` | `preCompact` / `PreCompact` | `PreCompress` | `preCompact` | — |
+| **Error** | — | — | `errorOccurred` / `ErrorOccurred` | — | — | — |
+| **Config change** | `ConfigChange` | — | — | — | — | — |
+| **File change** | `FileChanged` | — | — | — | — | — |
+| **Worktree** | `WorktreeCreate` / `WorktreeRemove` | — | — | — | — | — |
+| **Task lifecycle** | `TaskCreated` / `TaskCompleted` | — | — | — | — | — |
+| **Elicitation** | `Elicitation` / `ElicitationResult` | — | — | — | — | — |
+| **Instructions** | `InstructionsLoaded` | — | — | — | — | — |
+| **Teammate** | `TeammateIdle` | — | — | — | — | — |
+| **CWD change** | `CwdChanged` | — | — | — | — | — |
+| **Model switch** | `PreModelSwitch` / `PostModelSwitch` | — | — | — | — | — |
+| **Interruption** | — | `Interrupt` | — | — | — | — |
+| **Workspace open** | — | — | — | — | `workspaceOpen` | — |
 
 ### Integration Module Comparison
 
@@ -267,7 +318,9 @@ Fields available on hook stdin payloads across platforms:
 | `toolName` | — | — | camelCase tool events | — | — |
 | `tool_input` | `Record<string, unknown>` | Typed per tool | VS-compatible format | `Record<string, unknown>` | `Record<string, unknown>` |
 | `toolArgs` | — | — | camelCase tool events | — | — |
-| `tool_response` | Yes (PostToolUse) | Yes (PostToolUse) | — | Yes (`AfterTool`) | `string \| object` (postToolUse) |
+| `tool_response` | Yes (PostToolUse) | Yes (PostToolUse) | — | Yes (`AfterTool`) | — |
+| `tool_output` | — | — | — | — | `string \| object` (postToolUse; objects retained for capture compatibility) |
+| `model_id` / `model_params` | — | — | — | — | Typed model ID and parameter list |
 | `toolResult` / `tool_result` | — | — | success result shape | — | — |
 | `stop_hook_active` | Yes (Stop) | Yes (Stop) | — | Yes (`AfterAgent`) | — |
 | `timestamp` | — | — | number (camel) / string (VS) | Yes | — |
@@ -284,7 +337,7 @@ How hook scripts communicate results back to the platform:
 
 | Field | Claude | Codex | Copilot | Gemini | Cursor |
 |---|---|---|---|---|---|
-| `continue` | Optional | Default `true` | — | Optional | — |
+| `continue` | Optional | Default `true` | — | Optional | beforeSubmitPrompt; sessionStart parses but does not enforce it |
 | `decision` | `"block"` | `"approve" \| "block"` (PreToolUse), `"block"` (others) | `"block" \| "allow"` (agent stops) | `"allow" \| "deny" \| "block"` | — |
 | `reason` | Optional string | `string \| null` | Required for stop `block` | Optional string | — |
 | `hookSpecificOutput` | Discriminated on `hookEventName` | Strict wire schemas per event | — | Shared + Gemini extension | — |
@@ -294,8 +347,12 @@ How hook scripts communicate results back to the platform:
 | `permissionDecision` | via `hookSpecificOutput` | via `hookSpecificOutput` | `allow \| deny \| ask` | — | — |
 | `permissionDecisionReason` | via `hookSpecificOutput` | via `hookSpecificOutput` | Required for `deny` | — | — |
 | `modifiedArgs` | — | — | Optional tool arg replacement | — | — |
+| `modifiedResult` | — | — | Optional successful post-tool result replacement | — | — |
+| `permission` / `updated_input` | — | — | — | — | Event-specific permission decision / tool input replacement |
+| `additional_context` / `updated_mcp_tool_output` | — | — | — | — | Post-tool context / MCP output replacement |
+| `followup_message` / `pluginPaths` | — | — | — | — | Stop follow-up / workspace plugin directories |
 | `behavior` | — | — | `allow \| deny` (`permissionRequest`) | — | — |
-| `additionalContext` | via `hookSpecificOutput` | via `hookSpecificOutput` | Session/notification/subagent/failure | — | — |
+| `additionalContext` | Top-level or event-specific | via `hookSpecificOutput` | Session/notification/subagent/failure/post-tool | via `hookSpecificOutput` | — |
 | `hookSpecificOutput.updatedInput` | Optional | `object \| null` | — | — | — |
 | `hookSpecificOutput.updatedMCPToolOutput` | Optional (PostToolUse) | `object \| null` (PostToolUse) | — | — | — |
 | `hookSpecificOutput.tool_input` | — | — | — | Optional (Gemini-only) | — |

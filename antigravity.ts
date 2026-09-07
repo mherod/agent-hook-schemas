@@ -84,6 +84,7 @@ export const AntigravityPreToolUseInputSchema = AntigravityHookInputBaseSchema.e
 export type AntigravityPreToolUseInput = z.infer<typeof AntigravityPreToolUseInputSchema>;
 
 export const AntigravityPostToolUseInputSchema = AntigravityHookInputBaseSchema.extend({
+  toolCall: AntigravityToolCallSchema.optional(),
   stepIdx: OptionalNumberField,
   error: OptionalStringField,
 }).loose();

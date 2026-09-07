@@ -28,8 +28,12 @@ export const CursorHookEventNameSchema = z.enum([
   "stop",
   "subagentStart",
   "subagentStop",
+  "workspaceOpen",
 ]);
 export type CursorHookEventName = z.infer<typeof CursorHookEventNameSchema>;
+
+export const CursorModelParamSchema = z.object({ id: z.string(), value: z.string() }).loose();
+export type CursorModelParam = z.infer<typeof CursorModelParamSchema>;
 
 /**
  * Fields shared by most Cursor hook stdin payloads. `transcript_path` may be null (e.g. session
@@ -39,10 +43,12 @@ export const CursorHookInputBaseSchema = z.object({
   conversation_id: OptionalStringField,
   generation_id: OptionalStringField,
   model: OptionalStringField,
+  model_id: OptionalStringField,
+  model_params: z.array(CursorModelParamSchema).optional(),
   session_id: OptionalStringField,
   cursor_version: OptionalStringField,
   workspace_roots: z.array(z.string()).optional(),
-  user_email: OptionalStringField,
+  user_email: NullableStringSchema.optional(),
   transcript_path: NullableStringSchema.optional(),
 });
 export type CursorHookInputBase = z.infer<typeof CursorHookInputBaseSchema>;
@@ -130,6 +136,8 @@ export const CursorAfterMCPExecutionHookInputSchema = CursorHookInputBaseSchema.
   hook_event_name: z.literal("afterMCPExecution"),
   tool_name: OptionalToolNameField,
   tool_input: z.string().optional(),
+  mcp_server_name: OptionalStringField,
+  mcp_server_url: OptionalStringField,
   result_json: z.string().optional(),
   duration: OptionalNumberField,
 }).loose();
@@ -165,6 +173,8 @@ export const CursorBeforeMCPExecutionHookInputSchema = CursorHookInputBaseSchema
   hook_event_name: z.literal("beforeMCPExecution"),
   tool_name: OptionalToolNameField,
   tool_input: z.string().optional(),
+  mcp_server_name: OptionalStringField,
+  mcp_server_url: OptionalStringField,
   url: z.string().optional(),
   command: z.string().optional(),
 }).loose();
@@ -327,7 +337,17 @@ export const CursorSubagentStopHookInputSchema = CursorHookInputBaseSchema.exten
 }).loose();
 export type CursorSubagentStopHookInput = z.infer<typeof CursorSubagentStopHookInputSchema>;
 
+/** App lifecycle metadata; no agent conversation needs to exist. */
+export const CursorWorkspaceOpenHookInputSchema = z.object({
+  hook_event_name: z.literal("workspaceOpen"),
+  cursor_version: OptionalStringField,
+  workspace_roots: z.array(z.string()).optional(),
+  user_email: NullableStringSchema.optional(),
+}).loose();
+export type CursorWorkspaceOpenHookInput = z.infer<typeof CursorWorkspaceOpenHookInputSchema>;
+
 export const CursorHookEventInputSchema = z.discriminatedUnion("hook_event_name", [
+  CursorWorkspaceOpenHookInputSchema,
   CursorAfterAgentResponseHookInputSchema,
   CursorAfterAgentThoughtHookInputSchema,
   CursorAfterFileEditHookInputSchema,
@@ -354,4 +374,139 @@ export type CursorHookEventInput = z.infer<typeof CursorHookEventInputSchema>;
 /** Parse Cursor Agent hook stdin JSON. */
 export function ParseCursorHookInput(json: unknown) {
   return CursorHookEventInputSchema.safeParse(json);
+}
+
+// Configuration follows the executable string-matcher examples in the reference.
+// The reference's table says "object" but specifies no object matcher contract.
+export const CursorHookHandlerCommonSchema = z.object({
+  timeout: z.number().nonnegative().optional(),
+  matcher: z.string().optional(),
+  loop_limit: z.number().int().nonnegative().nullable().optional(),
+  failClosed: z.boolean().optional(),
+});
+export type CursorHookHandlerCommon = z.infer<typeof CursorHookHandlerCommonSchema>;
+
+export const CursorCommandHookHandlerSchema = CursorHookHandlerCommonSchema.extend({
+  type: z.literal("command").default("command"),
+  command: z.string(),
+});
+export type CursorCommandHookHandler = z.infer<typeof CursorCommandHookHandlerSchema>;
+
+export const CursorPromptHookHandlerSchema = CursorHookHandlerCommonSchema.extend({
+  type: z.literal("prompt"),
+  prompt: z.string(),
+  model: z.string().optional(),
+});
+export type CursorPromptHookHandler = z.infer<typeof CursorPromptHookHandlerSchema>;
+
+export const CursorHookHandlerSchema = z.union([
+  CursorCommandHookHandlerSchema,
+  CursorPromptHookHandlerSchema,
+]);
+export type CursorHookHandler = z.infer<typeof CursorHookHandlerSchema>;
+
+export const CursorHooksConfigSchema = z.partialRecord(CursorHookEventNameSchema, z.array(CursorHookHandlerSchema));
+export type CursorHooksConfig = z.infer<typeof CursorHooksConfigSchema>;
+export const CursorHooksFileSchema = z.object({
+  version: z.literal(1).default(1),
+  hooks: CursorHooksConfigSchema,
+}).loose();
+export type CursorHooksFile = z.infer<typeof CursorHooksFileSchema>;
+
+/** Cloud agents execute command hooks only. Validate separately from desktop configuration. */
+export const CursorCloudHooksFileSchema = CursorHooksFileSchema.superRefine((file, ctx) => {
+  for (const [event, handlers] of Object.entries(file.hooks)) {
+    for (const [index, handler] of handlers.entries()) {
+      if (handler.type === "prompt") ctx.addIssue({ code: "custom", message: "Cloud agents only support command hooks", path: ["hooks", event, index, "type"] });
+    }
+  }
+});
+export type CursorCloudHooksFile = z.infer<typeof CursorCloudHooksFileSchema>;
+
+export function ParseCursorHooksFile(json: unknown) { return CursorHooksFileSchema.safeParse(json); }
+
+/** Cursor's schema accepts ask here; preToolUse callers currently only enforce allow/deny. */
+export const CursorPermissionDecisionSchema = z.enum(["allow", "deny", "ask"]);
+export type CursorPermissionDecision = z.infer<typeof CursorPermissionDecisionSchema>;
+
+export const CursorBeforeShellExecutionStdoutSchema = z.object({
+  permission: CursorPermissionDecisionSchema.optional(),
+  user_message: OptionalStringField,
+  agent_message: OptionalStringField,
+}).strict();
+export type CursorBeforeShellExecutionStdout = z.infer<typeof CursorBeforeShellExecutionStdoutSchema>;
+export const CursorBeforeMCPExecutionStdoutSchema = CursorBeforeShellExecutionStdoutSchema;
+export type CursorBeforeMCPExecutionStdout = CursorBeforeShellExecutionStdout;
+export const CursorPreToolUseStdoutSchema = CursorBeforeShellExecutionStdoutSchema.extend({
+  updated_input: JsonObjectSchema.optional(),
+});
+export type CursorPreToolUseStdout = z.infer<typeof CursorPreToolUseStdoutSchema>;
+
+export const CursorPostToolUseStdoutSchema = z.object({
+  updated_mcp_tool_output: JsonObjectSchema.optional(),
+  additional_context: OptionalStringField,
+}).strict();
+export type CursorPostToolUseStdout = z.infer<typeof CursorPostToolUseStdoutSchema>;
+
+export const CursorSubagentStartStdoutSchema = z.object({
+  permission: z.enum(["allow", "deny"]).optional(),
+  user_message: OptionalStringField,
+}).strict();
+export type CursorSubagentStartStdout = z.infer<typeof CursorSubagentStartStdoutSchema>;
+export const CursorBeforeReadFileStdoutSchema = CursorSubagentStartStdoutSchema;
+export type CursorBeforeReadFileStdout = CursorSubagentStartStdout;
+export const CursorBeforeTabFileReadStdoutSchema = z.object({ permission: z.enum(["allow", "deny"]).optional() }).strict();
+export type CursorBeforeTabFileReadStdout = z.infer<typeof CursorBeforeTabFileReadStdoutSchema>;
+
+export const CursorStopStdoutSchema = z.object({ followup_message: OptionalStringField }).strict();
+export type CursorStopStdout = z.infer<typeof CursorStopStdoutSchema>;
+export const CursorSubagentStopStdoutSchema = CursorStopStdoutSchema;
+export type CursorSubagentStopStdout = CursorStopStdout;
+export const CursorBeforeSubmitPromptStdoutSchema = z.object({
+  continue: OptionalBooleanField,
+  user_message: OptionalStringField,
+}).strict();
+export type CursorBeforeSubmitPromptStdout = z.infer<typeof CursorBeforeSubmitPromptStdoutSchema>;
+
+/** continue/user_message parse for compatibility but cannot block session creation. */
+export const CursorSessionStartStdoutSchema = CursorBeforeSubmitPromptStdoutSchema.extend({
+  env: z.record(z.string(), z.string()).optional(),
+  additional_context: OptionalStringField,
+});
+export type CursorSessionStartStdout = z.infer<typeof CursorSessionStartStdoutSchema>;
+export const CursorPreCompactStdoutSchema = z.object({ user_message: OptionalStringField }).strict();
+export type CursorPreCompactStdout = z.infer<typeof CursorPreCompactStdoutSchema>;
+export const CursorWorkspaceOpenStdoutSchema = z.object({ pluginPaths: z.array(z.string()).optional() }).strict();
+export type CursorWorkspaceOpenStdout = z.infer<typeof CursorWorkspaceOpenStdoutSchema>;
+
+export const CursorObservationalStdoutSchema = z.object({}).strict();
+export type CursorObservationalStdout = z.infer<typeof CursorObservationalStdoutSchema>;
+export const CursorHookOutputSchemas = {
+  preToolUse: CursorPreToolUseStdoutSchema,
+  postToolUse: CursorPostToolUseStdoutSchema,
+  subagentStart: CursorSubagentStartStdoutSchema,
+  subagentStop: CursorSubagentStopStdoutSchema,
+  beforeShellExecution: CursorBeforeShellExecutionStdoutSchema,
+  beforeMCPExecution: CursorBeforeMCPExecutionStdoutSchema,
+  beforeReadFile: CursorBeforeReadFileStdoutSchema,
+  beforeTabFileRead: CursorBeforeTabFileReadStdoutSchema,
+  beforeSubmitPrompt: CursorBeforeSubmitPromptStdoutSchema,
+  stop: CursorStopStdoutSchema,
+  sessionStart: CursorSessionStartStdoutSchema,
+  preCompact: CursorPreCompactStdoutSchema,
+  workspaceOpen: CursorWorkspaceOpenStdoutSchema,
+  postToolUseFailure: CursorObservationalStdoutSchema,
+  afterAgentResponse: CursorObservationalStdoutSchema,
+  afterAgentThought: CursorObservationalStdoutSchema,
+  afterFileEdit: CursorObservationalStdoutSchema,
+  afterMCPExecution: CursorObservationalStdoutSchema,
+  afterShellExecution: CursorObservationalStdoutSchema,
+  afterTabFileEdit: CursorObservationalStdoutSchema,
+  sessionEnd: CursorObservationalStdoutSchema,
+} satisfies Record<CursorHookEventName, z.ZodType>;
+export type CursorHookOutput<E extends CursorHookEventName = CursorHookEventName> = z.infer<(typeof CursorHookOutputSchemas)[E]>;
+
+/** Select the event before validating stdout; an empty-output schema must not mask invalid decisions. */
+export function ParseCursorHookOutput<E extends CursorHookEventName>(event: E, json: unknown) {
+  return CursorHookOutputSchemas[event].safeParse(json) as z.ZodSafeParseResult<CursorHookOutput<E>>;
 }

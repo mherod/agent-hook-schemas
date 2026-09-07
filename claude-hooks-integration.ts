@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bashHookIfMatches } from "./claude-bash-if.ts";
 import {
   ClaudeSettingsFragmentSchema,
   ClaudeSettingsSchema,
@@ -15,7 +16,6 @@ import {
 } from "./claude.ts";
 import {
   appendHookEntriesByEvent,
-  defaultedTimeoutSec,
   mergeHookConfigLayers,
   parseSchemaResult,
   regexMatcherMatches,
@@ -50,11 +50,21 @@ export function mergeClaudeHooksFiles(
 }
 
 /**
- * Hook `matcher` is a RegExp source on `subject`, or match-all when omitted, `""`, or `"*"`
- * (Claude Code hooks guide).
+ * Simple names/lists match exactly; patterns with other characters use RegExp.
+ * Omitted, empty, and star matchers match everything.
  */
-export const claudeMatcherMatches: (matcher: string | undefined, subject: string) => boolean =
-  regexMatcherMatches;
+export function claudeMatcherMatches(
+  matcher: string | undefined,
+  subject: string,
+  event?: HookEventName,
+): boolean {
+  if (matcher === undefined || matcher === "" || matcher === "*") return true;
+  const narrow = event === "FileChanged" || event === "StopFailure";
+  if ((narrow ? /^[A-Za-z0-9_|]+$/ : /^[A-Za-z0-9_\- ,|]+$/).test(matcher)) {
+    return matcher.split(narrow ? /\|/ : /[|,]/).some((value) => (narrow ? value : value.trim()) === subject);
+  }
+  return regexMatcherMatches(matcher, subject);
+}
 
 /**
  * `if` permission-rule style guard (`Bash(git *)`, `Edit(*.ts)`). When `if` is set but stdin is
@@ -82,7 +92,7 @@ export function claudeToolIfMatches(
   }
 
   if (toolName === "Bash" && typeof toolInput.command === "string") {
-    return globRe.test(toolInput.command);
+    return bashHookIfMatches(toolInput.command, pattern);
   }
   if (
     (toolName === "Edit" || toolName === "Write" || toolName === "Read") &&
@@ -111,7 +121,7 @@ function handlerIfPasses(handler: HookHandler, ctx: ClaudeHookResolutionContext)
 
 /**
  * Handlers that would run for this event (merge order, then matcher group order, then hook order).
- * All handler types (command / http / prompt / agent) are included; only `if` and `matcher` gate.
+ * Command, HTTP, MCP, prompt and agent handlers are returned when supported by the event.
  */
 export function resolveMatchingClaudeHandlers(
   config: HooksConfig,
@@ -122,8 +132,11 @@ export function resolveMatchingClaudeHandlers(
   if (!groups?.length) return [];
   const out: HookHandler[] = [];
   for (const g of groups) {
-    if (!claudeMatcherMatches(g.matcher, ctx.subject)) continue;
+    const ignoresMatcher = ["UserPromptSubmit", "MessageDisplay", "PostToolBatch", "Stop", "TeammateIdle",
+      "TaskCreated", "TaskCompleted", "CwdChanged", "WorktreeCreate", "WorktreeRemove"].includes(event);
+    if (!ignoresMatcher && !claudeMatcherMatches(g.matcher, ctx.subject, event)) continue;
     for (const h of g.hooks) {
+      if ((event === "PreModelSwitch" || event === "PostModelSwitch") && (h.type === "prompt" || h.type === "agent")) continue;
       if (handlerIfPasses(h, ctx)) out.push(h);
     }
   }
@@ -189,7 +202,7 @@ function subjectForClaudeInput(input: HookEventInput): string {
     case "SubagentStart":
       return i.agent_type as string;
     case "SubagentStop":
-      return i.last_assistant_message as string;
+      return i.agent_type as string;
     case "TaskCreated":
     case "TaskCompleted":
       return i.task_subject as string;
@@ -214,12 +227,17 @@ function subjectForClaudeInput(input: HookEventInput): string {
     case "PreCompact":
     case "PostCompact":
       return i.trigger as string;
+    case "PreModelSwitch":
+    case "PostModelSwitch":
+      // The reference uses canonical model names; callers with provider-specific
+      // IDs may supply their canonical subject to resolveMatchingClaudeHandlers.
+      return i.to_model as string;
     case "SessionEnd":
       return i.reason as string;
     case "Elicitation":
       return i.mcp_server_name as string;
     case "ElicitationResult":
-      return `${i.mcp_server_name as string}:${i.action as string}`;
+      return i.mcp_server_name as string;
     default: {
       const _exhaustive: never = i.hook_event_name;
       return _exhaustive;
@@ -239,9 +257,35 @@ export function resolveMatchingClaudeHandlersFromInput(
   );
 }
 
-/** Effective timeout in seconds (Claude command/http handlers; default 600 when omitted). */
-export const effectiveClaudeHandlerTimeoutSec = (handler: Pick<HookHandler, "timeout">): number =>
-  defaultedTimeoutSec(handler.timeout, 600);
+/** Shared SessionEnd budget from settings handlers; plugin timeouts do not raise it. */
+export function effectiveClaudeSessionEndBudgetSec(
+  settingsHandlers: readonly Pick<HookHandler, "timeout">[],
+): number {
+  return settingsHandlers.reduce((budget, handler) => Math.min(Math.max(budget, handler.timeout ?? 0), 60), 1.5);
+}
+
+/**
+ * Event/type defaults. Infinity denotes async:true without asyncRewake.
+ * For SessionEnd, pass the shared settings budget (or explicit environment override
+ * in seconds). When omitted, estimate the budget using this handler alone.
+ */
+export function effectiveClaudeHandlerTimeoutSec(
+  handler: Pick<HookHandler, "timeout"> & { type?: HookHandler["type"]; async?: boolean; asyncRewake?: boolean },
+  event?: HookEventName,
+  sessionEndBudgetSec?: number,
+): number {
+  if ((handler.type === undefined || handler.type === "command") && handler.async && !handler.asyncRewake) return Infinity;
+  if (event === "SessionEnd") {
+    const budget = sessionEndBudgetSec ?? effectiveClaudeSessionEndBudgetSec([handler]);
+    return Math.min(handler.timeout ?? budget, budget);
+  }
+  if (handler.timeout !== undefined) return handler.timeout;
+  if (handler.type === "prompt") return 30;
+  if (handler.type === "agent") return 60;
+  if (event === "MessageDisplay") return 10;
+  if (event === "UserPromptSubmit" || event === "PreModelSwitch" || event === "PostModelSwitch") return 30;
+  return 600;
+}
 
 // ---------------------------------------------------------------------------
 // Permission rule matching (settings.json `permissions.allow` / `permissions.deny`)
@@ -290,6 +334,11 @@ export function claudePermissionRuleMatches(
     if (!rule.startsWith(`${toolName}(`)) return false;
   }
   if (!parsed.pattern) return parsed.toolName === toolName;
+  // Hook filters intentionally run on uncertain shell syntax. Permission rules
+  // must never turn that conservative hook selection into an authorization.
+  if (toolName === "Bash") {
+    return typeof toolInput.command === "string" && simpleGlobToRegExp(parsed.pattern).test(toolInput.command);
+  }
   return claudeToolIfMatches(toolName, toolInput, rule);
 }
 

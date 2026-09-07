@@ -87,6 +87,8 @@ export const HookEventNameSchema = z.enum([
   "DirectoryAdded",
   "PreCompact",
   "PostCompact",
+  "PreModelSwitch",
+  "PostModelSwitch",
   "SessionEnd",
   "Elicitation",
   "ElicitationResult",
@@ -106,6 +108,7 @@ export const SessionStartSourceSchema = z.enum([
   "compact",
   "init",
   "restore",
+  "fork",
 ]);
 export type SessionStartSource = z.infer<typeof SessionStartSourceSchema>;
 
@@ -158,6 +161,12 @@ export const NotificationTypeSchema = z.enum([
   "elicitation_dialog",
   "elicitation_complete",
   "elicitation_response",
+  "elicitation_url_dialog",
+  "agent_needs_input",
+  "agent_completed",
+  "quota_auto_resume_fired",
+  "quota_auto_resume_stale",
+  "quota_auto_resume_disabled",
 ]);
 
 /**
@@ -185,6 +194,7 @@ export const StopFailureErrorSchema = z.enum([
   "overloaded",
   "authentication_failed",
   "oauth_org_not_allowed",
+  "account_on_hold",
   "billing_error",
   "invalid_request",
   "model_not_found",
@@ -627,6 +637,32 @@ export const PostCompactInputSchema = hookStdinLoose("PostCompact", {
 });
 export type PostCompactInput = z.infer<typeof PostCompactInputSchema>;
 
+/** Model-switch metadata from the public hooks reference; stdin remains partial and extensible. */
+export const ModelSwitchInputFieldsSchema = z.object({
+  from_model: z.string().optional(),
+  to_model: z.string().optional(),
+  requested_model: z.string().nullable().optional(),
+  context_tokens: z.number().optional(),
+  prompt_cache_warm: z.boolean().optional(),
+  cache_ttl: z.enum(["5m", "1h"]).or(z.string()).optional(),
+  estimated_cache_write_usd: z.number().optional(),
+  pricing: z.enum(["configured", "catalog", "default"]).or(z.string()).optional(),
+});
+export type ModelSwitchInputFields = z.infer<typeof ModelSwitchInputFieldsSchema>;
+
+export const PreModelSwitchInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.literal("PreModelSwitch"),
+  source: z.enum(["command", "picker", "sdk"]).or(z.string()).optional(),
+}).extend(ModelSwitchInputFieldsSchema.shape).loose();
+export type PreModelSwitchInput = z.infer<typeof PreModelSwitchInputSchema>;
+
+/** Available in Claude Code v2.1.251+. */
+export const PostModelSwitchInputSchema = HookInputBaseSchema.extend({
+  hook_event_name: z.literal("PostModelSwitch"),
+  source: z.enum(["command", "picker", "sdk", "auto", "resume"]).or(z.string()).optional(),
+}).extend(ModelSwitchInputFieldsSchema.shape).loose();
+export type PostModelSwitchInput = z.infer<typeof PostModelSwitchInputSchema>;
+
 export const SessionEndInputSchema = hookStdinLoose("SessionEnd", {
   reason: SessionEndReasonSchema.optional(),
 });
@@ -699,6 +735,8 @@ export const HookEventInputSchema = z.discriminatedUnion("hook_event_name", [
   DirectoryAddedInputSchema,
   PreCompactInputSchema,
   PostCompactInputSchema,
+  PreModelSwitchInputSchema,
+  PostModelSwitchInputSchema,
   SessionEndInputSchema,
   ElicitationInputSchema,
   ElicitationResultInputSchema,
@@ -859,7 +897,23 @@ export type HookSpecificMessageDisplayOutput = z.infer<
   typeof HookSpecificMessageDisplayOutputSchema
 >;
 
+/** Model switches support allow/deny/ask; defer and tool rewrites do not apply. */
+export const HookSpecificPreModelSwitchOutputSchema = z.object({
+  hookEventName: z.literal("PreModelSwitch"),
+  permissionDecision: z.enum(["allow", "deny", "ask"]).optional(),
+  permissionDecisionReason: z.string().optional(),
+}).strict();
+export type HookSpecificPreModelSwitchOutput = z.infer<typeof HookSpecificPreModelSwitchOutputSchema>;
+
+/** PostModelSwitch consumes top-level additionalContext, not a hookSpecificOutput object. */
+export const PostModelSwitchStdoutSchema = z.object({
+  additionalContext: z.string().optional(),
+  systemMessage: z.string().optional(),
+}).loose();
+export type PostModelSwitchStdout = z.infer<typeof PostModelSwitchStdoutSchema>;
+
 export const HookSpecificOutputSchema = z.union([
+  HookSpecificPreModelSwitchOutputSchema,
   HookSpecificPreToolUseOutputSchema,
   HookSpecificPermissionRequestOutputSchema,
   HookSpecificPermissionDeniedOutputSchema,
@@ -908,7 +962,7 @@ export type PromptHookModelResponse = z.infer<typeof PromptHookModelResponseSche
 // Settings: hook configuration (practical for plugins / settings.json)
 // ---------------------------------------------------------------------------
 
-export const HookHandlerTypeSchema = z.enum(["command", "http", "prompt", "agent"]);
+export const HookHandlerTypeSchema = z.enum(["command", "http", "mcp_tool", "prompt", "agent"]);
 export type HookHandlerType = z.infer<typeof HookHandlerTypeSchema>;
 
 const PromptOrAgentHookPromptFieldsSchema = z.object({
@@ -924,6 +978,15 @@ export const HttpHookHandlerSchema = HookHandlerCommonSchema.extend({
 });
 export type HttpHookHandler = z.infer<typeof HttpHookHandlerSchema>;
 
+/** Calls an already-connected MCP server; input strings may contain event-field templates. */
+export const McpToolHookHandlerSchema = HookHandlerCommonSchema.extend({
+  type: z.literal("mcp_tool"),
+  server: z.string(),
+  tool: z.string(),
+  input: JsonObjectSchema.optional(),
+});
+export type McpToolHookHandler = z.infer<typeof McpToolHookHandlerSchema>;
+
 export const PromptHookHandlerSchema = HookHandlerCommonSchema.extend({
   type: z.literal("prompt"),
 }).extend(PromptOrAgentHookPromptFieldsSchema.shape);
@@ -937,6 +1000,7 @@ export type AgentHookHandler = z.infer<typeof AgentHookHandlerSchema>;
 export const HookHandlerSchema = z.discriminatedUnion("type", [
   CommandHookHandlerSchema,
   HttpHookHandlerSchema,
+  McpToolHookHandlerSchema,
   PromptHookHandlerSchema,
   AgentHookHandlerSchema,
 ]);

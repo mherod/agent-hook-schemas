@@ -119,6 +119,39 @@ export const GeminiSettingsSchema = z
   .loose();
 export type GeminiSettings = z.infer<typeof GeminiSettingsSchema>;
 
+/** Stable hook model API; partial objects also describe output overrides. */
+export const GeminiLlmMessageSchema = z.object({
+  role: z.enum(["user", "model", "system"]).or(z.string()),
+  content: z.string(),
+}).loose();
+export type GeminiLlmMessage = z.infer<typeof GeminiLlmMessageSchema>;
+
+export const GeminiToolConfigSchema = z.object({
+  mode: z.enum(["AUTO", "ANY", "NONE"]).or(z.string()).optional(),
+  allowedFunctionNames: z.array(z.string()).optional(),
+}).loose();
+export type GeminiToolConfig = z.infer<typeof GeminiToolConfigSchema>;
+
+export const GeminiLlmRequestSchema = z.object({
+  model: z.string().optional(),
+  messages: z.array(GeminiLlmMessageSchema).optional(),
+  config: z.object({ temperature: z.number().optional() }).loose().optional(),
+  toolConfig: GeminiToolConfigSchema.optional(),
+}).loose();
+export type GeminiLlmRequest = z.infer<typeof GeminiLlmRequestSchema>;
+
+export const GeminiLlmResponseSchema = z.object({
+  candidates: z.array(z.object({
+    content: z.object({
+      role: z.literal("model").or(z.string()).optional(),
+      parts: z.array(z.string()).optional(),
+    }).loose().optional(),
+    finishReason: z.string().optional(),
+  }).loose()).optional(),
+  usageMetadata: z.object({ totalTokenCount: z.number().optional() }).loose().optional(),
+}).loose();
+export type GeminiLlmResponse = z.infer<typeof GeminiLlmResponseSchema>;
+
 // --- stdin (discriminated on hook_event_name) --------------------------------
 
 const GeminiHookInputBaseSchema = z.object({
@@ -156,20 +189,20 @@ export type GeminiAfterAgentInput = z.infer<typeof GeminiAfterAgentInputSchema>;
 
 export const GeminiBeforeModelInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("BeforeModel"),
-  llm_request: JsonObjectSchema.optional(),
+  llm_request: GeminiLlmRequestSchema.optional(),
 }).loose();
 export type GeminiBeforeModelInput = z.infer<typeof GeminiBeforeModelInputSchema>;
 
 export const GeminiAfterModelInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("AfterModel"),
-  llm_request: JsonObjectSchema.optional(),
-  llm_response: JsonObjectSchema.optional(),
+  llm_request: GeminiLlmRequestSchema.optional(),
+  llm_response: GeminiLlmResponseSchema.optional(),
 }).loose();
 export type GeminiAfterModelInput = z.infer<typeof GeminiAfterModelInputSchema>;
 
 export const GeminiBeforeToolSelectionInputSchema = GeminiHookInputBaseSchema.extend({
   hook_event_name: z.literal("BeforeToolSelection"),
-  llm_request: JsonObjectSchema.optional(),
+  llm_request: GeminiLlmRequestSchema.optional(),
 }).loose();
 export type GeminiBeforeToolSelectionInput = z.infer<typeof GeminiBeforeToolSelectionInputSchema>;
 
@@ -300,8 +333,8 @@ export const GeminiHookSpecificOutputExtensionSchema = z
   .object({
     tool_input: JsonObjectSchema.optional(),
     additionalContext: OptionalStringField,
-    llm_request: JsonObjectSchema.optional(),
-    llm_response: JsonObjectSchema.optional(),
+    llm_request: GeminiLlmRequestSchema.optional(),
+    llm_response: GeminiLlmResponseSchema.optional(),
     toolConfig: z
       .object({
         mode: z.enum(["AUTO", "ANY", "NONE"]).optional(),

@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   CopilotHookEventNameSchema,
   CopilotHooksFileSchema,
+  parseCopilotHooksDirectoryFile,
   type CopilotHookEventInput,
   type CopilotHookEventName,
   type CopilotHookHandler,
@@ -37,6 +38,21 @@ export function mergeCopilotHooksFiles(
   });
 }
 
+/** Runtime-style directory loading; structural file errors do not suppress other files. */
+export function mergeCopilotHooksDirectoryFiles(files: unknown[]) {
+  const valid: unknown[] = [];
+  const diagnostics: { fileIndex: number; event?: string; index?: number; error: z.ZodError }[] = [];
+  for (const [fileIndex, value] of files.entries()) {
+    const parsed = parseCopilotHooksDirectoryFile(value);
+    if (!parsed.ok) { diagnostics.push({ fileIndex, error: parsed.error }); continue; }
+    valid.push(parsed.file);
+    diagnostics.push(...parsed.diagnostics.map((issue) => ({ fileIndex, ...issue })));
+  }
+  const merged = mergeCopilotHooksFiles(valid);
+  if (!merged.ok) throw new Error("Validated Copilot directory files failed to merge", { cause: merged.error });
+  return { config: merged.config, diagnostics };
+}
+
 // ---------------------------------------------------------------------------
 // Matcher matching
 // ---------------------------------------------------------------------------
@@ -60,6 +76,16 @@ const COPILOT_MATCHER_EVENTS: ReadonlySet<CopilotHookEventName> = new Set([
  */
 export function copilotMatcherMatches(matcher: string | undefined, subject: string): boolean {
   return regexMatcherMatches(matcher, subject, { wildcard: false, anchored: true });
+}
+
+/** Runtime transport policy; allowLocalhost represents COPILOT_HOOK_ALLOW_LOCALHOST=1. */
+export function copilotHttpHookUrlAllowed(url: string, allowLocalhost = false): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "https:") return true;
+    return parsed.protocol === "http:" && allowLocalhost &&
+      (parsed.hostname === "localhost" || parsed.hostname === "[::1]" || /^127\.\d+\.\d+\.\d+$/.test(parsed.hostname));
+  } catch { return false; }
 }
 
 function copilotEventUsesMatcher(event: CopilotHookEventName): boolean {
@@ -166,8 +192,8 @@ export function resolveMatchingCopilotHandlersFromInput(
 
 /** Effective timeout in seconds (Copilot default: 30). */
 export const effectiveCopilotHandlerTimeoutSec = (
-  handler: Pick<CopilotHookHandler, "timeoutSec">,
-): number => defaultedTimeoutSec(handler.timeoutSec, 30);
+  handler: Pick<CopilotHookHandler, "timeoutSec" | "timeout">,
+): number => defaultedTimeoutSec(handler.timeoutSec ?? handler.timeout, 30);
 
 // ---------------------------------------------------------------------------
 // Validation helpers
