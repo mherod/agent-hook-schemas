@@ -2,6 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   codexMatcherMatches,
+  codexResolutionContextFromInput,
   codexToolIfMatches,
   effectiveCodexHandlerTimeoutSec,
   mergeCodexHooksFiles,
@@ -13,6 +14,7 @@ import {
   CodexCommandHookHandlerSchema,
   CodexSessionEndStdoutSchema,
   ParseCodexHookInput,
+  type CodexHookHandler,
 } from "./index.ts";
 
 const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number; if: string }>) =>
@@ -21,6 +23,40 @@ const cmd = (c: string, extra?: Partial<{ timeout: number; timeoutSec: number; i
     command: c,
     ...extra,
   });
+
+function asCommandHandler(handler: CodexHookHandler | undefined) {
+  if (!handler || handler.type !== "command") throw new Error("Expected a command hook handler");
+  return handler;
+}
+
+describe("Codex partial stdin and guard boundaries", () => {
+  test("tool guards reject missing command fields, other tools, and malformed rules", () => {
+    expect(codexToolIfMatches("Bash", {}, "Bash(git *)")).toBe(false);
+    expect(codexToolIfMatches("Read", { file_path: "x" }, "Read(*.ts)")).toBe(false);
+    expect(codexToolIfMatches("Bash", {}, "Bash()")).toBe(true);
+    expect(codexToolIfMatches("Bash", {}, "Bash(*)")).toBe(true);
+    expect(codexToolIfMatches("Bash", {}, "Bash(")).toBe(false);
+  });
+  test.each(["UserPromptSubmit", "Stop", "Interrupt"] as const)("%s resolves with an empty matcher subject", (event) => {
+    const parsed = ParseCodexHookInput({ hook_event_name: event });
+    if (!parsed.success) throw parsed.error;
+    expect(codexResolutionContextFromInput(parsed.data)).toEqual({ subject: "" });
+  });
+  test.each(["PreToolUse", "PermissionRequest", "PostToolUse"] as const)("%s only exposes object tool input to guards", (event) => {
+    for (const tool_input of [undefined, null, "git status", ["git", "status"], { command: "git status" }]) {
+      const parsed = ParseCodexHookInput({ hook_event_name: event, tool_input });
+      if (!parsed.success) throw parsed.error;
+      expect(codexResolutionContextFromInput(parsed.data)).toEqual({ subject: "", toolName: "",
+        toolInput: tool_input && typeof tool_input === "object" && !Array.isArray(tool_input) ? tool_input : undefined,
+      });
+    }
+  });
+  test("session end budget handles explicit zero and negative timeout defensively", () => {
+    expect(effectiveCodexHandlerTimeoutSec({ timeout: 0 }, "SessionEnd")).toBe(0);
+    expect(effectiveCodexHandlerTimeoutSec({ timeout: -1 }, "SessionEnd")).toBe(0);
+    expect(effectiveCodexHandlerTimeoutSec({ timeoutSec: 20 }, "SessionEnd")).toBe(3);
+  });
+});
 
 describe("mergeCodexHooksFiles", () => {
   test("empty file list yields empty merged config", () => {
@@ -57,8 +93,8 @@ describe("mergeCodexHooksFiles", () => {
     expect(r.config.PreToolUse?.length).toBe(2);
     expect(r.config.Stop?.length).toBe(1);
     expect(r.config.SessionStart?.length).toBe(1);
-    expect(r.config.PreToolUse?.[0]?.hooks[0]?.command).toBe("user-pre.sh");
-    expect(r.config.PreToolUse?.[1]?.hooks[0]?.command).toBe("project-pre.sh");
+    expect(asCommandHandler(r.config.PreToolUse?.[0]?.hooks[0]).command).toBe("user-pre.sh");
+    expect(asCommandHandler(r.config.PreToolUse?.[1]?.hooks[0]).command).toBe("project-pre.sh");
   });
 
   test("third layer continues appending (multi-file discovery)", () => {
@@ -69,7 +105,7 @@ describe("mergeCodexHooksFiles", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.config.PostToolUse?.length).toBe(3);
-    expect(r.config.PostToolUse?.map((g) => g.hooks[0]?.command)).toEqual([
+    expect(r.config.PostToolUse?.map((g) => asCommandHandler(g.hooks[0]).command)).toEqual([
       "a",
       "b",
       "c",
@@ -127,7 +163,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       toolName: "Bash",
       toolInput: { command: "ls" },
     });
-    expect(handlers.map((h) => h.command)).toEqual([
+    expect(handlers.map((h) => asCommandHandler(h).command)).toEqual([
       "policy-a.sh",
       "policy-b.sh",
       "policy-c.sh",
@@ -147,8 +183,8 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       toolInput: { command: "ls" },
     });
     expect(handlers).toHaveLength(2);
-    expect(handlers[0]?.command).toBe("dup.sh");
-    expect(handlers[1]?.command).toBe("dup.sh");
+    expect(asCommandHandler(handlers[0]).command).toBe("dup.sh");
+    expect(asCommandHandler(handlers[1]).command).toBe("dup.sh");
   });
 
   test("UserPromptSubmit: matcher ignored — all handlers from all groups", () => {
@@ -169,7 +205,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       "UserPromptSubmit",
       { subject: "" },
     );
-    expect(handlers.map((h) => h.command)).toEqual(["a.sh", "b.sh", "c.sh"]);
+    expect(handlers.map((h) => asCommandHandler(h).command)).toEqual(["a.sh", "b.sh", "c.sh"]);
   });
 
   test("Stop: matcher ignored — every group runs", () => {
@@ -180,7 +216,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       ],
     };
     expect(
-      resolveMatchingCodexHandlers(config, "Stop", { subject: "" }).map((h) => h.command),
+      resolveMatchingCodexHandlers(config, "Stop", { subject: "" }).map((h) => asCommandHandler(h).command),
     ).toEqual(["stop-a.sh", "stop-b.sh"]);
   });
 
@@ -193,12 +229,12 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
     };
     expect(
       resolveMatchingCodexHandlers(config, "SessionStart", { subject: "startup" }).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["on-startup.sh"]);
     expect(
       resolveMatchingCodexHandlers(config, "SessionStart", { subject: "resume" }).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["on-resume.sh"]);
   });
@@ -215,7 +251,7 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
         subject: "Bash",
         toolName: "Bash",
         toolInput: { command: "ls" },
-      }).map((h) => h.command),
+      }).map((h) => asCommandHandler(h).command),
     ).toEqual(["review.sh"]);
   });
 
@@ -236,14 +272,14 @@ describe("resolveMatchingCodexHandlers (matching + concurrency list)", () => {
       toolName: "Bash",
       toolInput: { command: "git status" },
     });
-    expect(gitHandlers.map((h) => h.command)).toEqual(["always.sh", "git-only.sh"]);
+    expect(gitHandlers.map((h) => asCommandHandler(h).command)).toEqual(["always.sh", "git-only.sh"]);
 
     const lsHandlers = resolveMatchingCodexHandlers(config, "PreToolUse", {
       subject: "Bash",
       toolName: "Bash",
       toolInput: { command: "ls -la" },
     });
-    expect(lsHandlers.map((h) => h.command)).toEqual(["always.sh"]);
+    expect(lsHandlers.map((h) => asCommandHandler(h).command)).toEqual(["always.sh"]);
   });
 });
 
@@ -283,7 +319,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
       merged.config,
       parsed.data,
     );
-    expect(handlers.map((h) => h.command)).toEqual([
+    expect(handlers.map((h) => asCommandHandler(h).command)).toEqual([
       "global-pre.sh",
       "repo-pre.sh",
     ]);
@@ -316,7 +352,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
     if (!resume.success) return;
     expect(
       resolveMatchingCodexHandlersFromInput(merged.config, resume.data).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["resume.sh"]);
   });
@@ -351,7 +387,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
     if (!stop.success) return;
     expect(
       resolveMatchingCodexHandlersFromInput(merged.config, stop.data).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["explore-stop.sh"]);
   });
@@ -382,7 +418,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
     if (!pre.success) return;
     expect(
       resolveMatchingCodexHandlersFromInput(merged.config, pre.data).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["auto-precompact.sh"]);
   });
@@ -414,7 +450,7 @@ describe("resolveMatchingCodexHandlersFromInput", () => {
     if (!end.success) return;
     expect(
       resolveMatchingCodexHandlersFromInput(merged.config, end.data).map(
-        (h) => h.command,
+        (h) => asCommandHandler(h).command,
       ),
     ).toEqual(["other-sessionend.sh"]);
   });
@@ -631,8 +667,8 @@ describe("CodexCommandHookHandlerSchema & OpenAI contract alignment (#23)", () =
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     const h = parsed.config.PreToolUse?.[0]?.hooks[0];
-    expect(h?.commandWindows).toBe(".\\gate.ps1");
-    expect(h?.additionalContextLimit).toBe(2000);
+    expect(asCommandHandler(h).commandWindows).toBe(".\\gate.ps1");
+    expect(asCommandHandler(h).additionalContextLimit).toBe(2000);
     expect(h?.statusMessage).toBe("Verifying tool call");
 
     const merged = mergeCodexHooksFiles([file]);
@@ -642,8 +678,8 @@ describe("CodexCommandHookHandlerSchema & OpenAI contract alignment (#23)", () =
       subject: "Bash",
     });
     expect(resolved).toHaveLength(1);
-    expect(resolved[0]?.commandWindows).toBe(".\\gate.ps1");
-    expect(resolved[0]?.additionalContextLimit).toBe(2000);
+    expect(asCommandHandler(resolved[0]).commandWindows).toBe(".\\gate.ps1");
+    expect(asCommandHandler(resolved[0]).additionalContextLimit).toBe(2000);
     expect(resolved[0]?.statusMessage).toBe("Verifying tool call");
   });
 });
@@ -712,6 +748,6 @@ describe("Codex SessionEnd hook support (#24)", () => {
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.config.SessionEnd).toHaveLength(1);
-    expect(parsed.config.SessionEnd?.[0]?.hooks[0]?.command).toBe("./cleanup.sh");
+    expect(asCommandHandler(parsed.config.SessionEnd?.[0]?.hooks[0]).command).toBe("./cleanup.sh");
   });
 });

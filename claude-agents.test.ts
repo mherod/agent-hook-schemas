@@ -109,7 +109,7 @@ describe("Claude agent tool reference updates", () => {
   });
 
   test("agent envelopes accept the legacy Task alias and preserve hook metadata", () => {
-    for (const tool_name of ["Agent", "Task"]) {
+    for (const tool_name of ["Agent", "Task"] as const) {
       const payload = { tool_name, tool_input: { prompt: "Review" }, tool_use_id: "tool-1" };
       expect(ParseClaudeAgentToolInput(payload)).toEqual({ success: true, data: payload });
     }

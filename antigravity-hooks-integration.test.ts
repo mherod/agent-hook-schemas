@@ -33,6 +33,34 @@ describe("antigravityMatcherMatches", () => {
 });
 
 describe("mergeAntigravityHooksFiles and resolveMatchingAntigravityHandlers", () => {
+  test("parses complete files and reports schema errors", () => {
+    const hooks = { guard: { enabled: true, Stop: [{ command: "stop" }] } };
+    expect(parseAntigravityHooksFile(hooks)).toEqual({ ok: true, hooks: { guard: { enabled: true, Stop: [{ type: "command", command: "stop" }] } } });
+    expect(parseAntigravityHooksFile({ guard: { Stop: "bad" } }).ok).toBe(false);
+    expect(mergeAntigravityHooksFiles([])).toEqual({ ok: true, hooks: {} });
+  });
+
+  test("merges all lifecycle handlers without mutating layers and honors later enablement", () => {
+    const layer = (command: string) => ({ guard: {
+      PostToolUse: [{ hooks: [{ command }] }],
+      PreInvocation: [{ command }], PostInvocation: [{ command }], Stop: [{ command }],
+    } });
+    const layers = [{ ...layer("first"), disabled: { enabled: false } }, layer("second")];
+    const snapshot = structuredClone(layers);
+    const result = mergeAntigravityHooksFiles(layers);
+    if (!result.ok) throw result.error;
+    for (const event of ["PostToolUse", "PreInvocation", "PostInvocation", "Stop"] as const) {
+      expect(resolveMatchingAntigravityHandlers(result.hooks, event)).toEqual([{ type: "command", command: "first" }, { type: "command", command: "second" }]);
+    }
+    expect(layers).toEqual(snapshot);
+    const enabled = mergeAntigravityHooksFiles([
+      { guard: { enabled: false, Stop: [{ command: "run" }] } },
+      { guard: { enabled: true } },
+    ]);
+    if (!enabled.ok) throw enabled.error;
+    expect(resolveMatchingAntigravityHandlers(enabled.hooks, "Stop")).toEqual([{ type: "command", command: "run" }]);
+  });
+
   test("merges multiple hooks.json layers and preserves enabled states", () => {
     const workspaceHooks = {
       "security-checker": {

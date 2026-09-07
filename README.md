@@ -447,9 +447,33 @@ How hook scripts communicate results back to the platform:
 
 ```bash
 bun install
-bun test
-bun run build   # tsup → dist/
+bun run build          # tsup → dist/ (required by the package smoke tests)
+bun run test           # all tests, isolated across four workers
+bun run test:types     # type-check library, test fixtures and development scripts
+bun run test:coverage  # build, type-check, package smoke tests, source coverage and gate
 ```
+
+`test:coverage` writes a text report and `coverage/lcov.info`. It includes every
+root library module, even if no test imports it. Tests, test helpers, development
+scripts, build configuration and generated bundles are excluded from source
+coverage. Published exports are checked separately by `dist-smoke.test.ts`.
+
+The gate requires **100% function coverage** and rejects every uncovered source
+line except the three-line `never` fallback in
+`sharedHookSpecificAdditionalContextSchema`. That branch is unreachable for the
+declared TypeScript parameter union. It remains visible in the raw report
+(currently **99.91% lines**); `common.ts` is included in coverage. The gate also
+rejects missing modules. `bunfig.toml` supplies a 98% per-file line floor, and
+`scripts/check-coverage.ts` enforces the stricter line-by-line rule.
+
+The coverage entry loads the source suites in one module registry to avoid
+[Bun's worker coverage merge bug](https://github.com/oven-sh/bun/issues/39930).
+Use `bun run test:coverage` for coverage; ordinary `bun run test` retains file
+isolation. The coverage command requires Bun 1.4 or later.
+
+Coverage measures executed lines and functions, not branch coverage or complete
+provider protocol conformance. Optional local capture tests may skip when their
+`/private/tmp` files are absent; deterministic fixtures always run.
 
 ## License
 

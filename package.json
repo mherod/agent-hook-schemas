@@ -104,7 +104,9 @@
   "scripts": {
     "build": "tsup",
     "prepublishOnly": "bun run build",
-    "test": "bun test"
+    "test": "bun test --parallel=4",
+    "test:types": "tsc --noEmit",
+    "test:coverage": "bun run build && bun run test:types && bun test ./dist-smoke.test.ts && bun test ./scripts/coverage-suite.ts --parallel=4 --coverage && bun run scripts/check-coverage.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

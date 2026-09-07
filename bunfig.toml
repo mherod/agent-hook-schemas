@@ -1,0 +1,8 @@
+[test]
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["dist/**", "scripts/**", "test-utils.ts", "tsup.config.ts"]
+# Bun applies these thresholds per file. The LCOV gate additionally rejects
+# every uncovered line except common.ts's documented exhaustive-switch guard.
+coverageThreshold = { lines = 0.98, functions = 1.0 }

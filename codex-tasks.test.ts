@@ -13,6 +13,11 @@ import {
 } from "./codex-tasks.ts";
 
 describe("codex-tasks", () => {
+  test("invalid JSON arguments return a parse error without throwing", () => {
+    for (const text of ["", "{", "undefined", "{\"plan\":[]", "null", "[]"]) {
+      expect(ParseUpdatePlanArguments(text).success).toBe(false);
+    }
+  });
   test("validates the captured update_plan argument payload", () => {
     const payload = {
       explanation: "Creating the required five-task plan before analysis work, per the report-issue skill.",

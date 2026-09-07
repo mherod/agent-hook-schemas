@@ -2388,7 +2388,7 @@ describe("codex docs: stdin (ParseCodexHookInput)", () => {
     });
     expect(r.success).toBe(true);
     if (r.success && r.data.hook_event_name === "PreToolUse") {
-      expect(r.data.tool_input?.command).toBe("npm test");
+      expect(r.data.tool_input).toEqual({ command: "npm test" });
     }
   });
 

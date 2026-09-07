@@ -20,7 +20,7 @@ describe("dist bundle smoke test", () => {
     expect(claude.ParseSendMessageToolInput(message)).toEqual({ success: true, data: message });
     expect(root.ParseSendMessageToolInput(message)).toEqual({ success: true, data: message });
     expect(claude.AgentToolInputSchema.parse({ prompt: "Review" })).toEqual({ prompt: "Review" });
-    const call = { tool_name: "spawn_agent", tool_input: { task_name: "review", message: "Review" } };
+    const call = { tool_name: "spawn_agent" as const, tool_input: { task_name: "review", message: "Review" } };
     expect(codex.ParseCodexCollaborationV2ToolInput(call)).toEqual({ success: true, data: call });
     expect(root.ParseCodexCollaborationV2ToolInput(call)).toEqual({ success: true, data: call });
     expect(codex.ParseCodexCollaborationV1ToolResponse("spawn_agent", { agent_id: "agent-1", nickname: null }).success).toBe(true);

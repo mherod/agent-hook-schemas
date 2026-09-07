@@ -10,10 +10,19 @@ bun run build              # tsup → dist/ (ESM + .d.ts)
 bun test --parallel=4       # run all tests with bounded file-level workers
 bun test --parallel=4 codex-tasks.test.ts index.test.ts codex-hooks-integration.test.ts  # run specific test files
 bun test hook-docs-update.test.ts  # a single test file needs no parallel flag
+bun run test:types          # type-check library, tests and development scripts
+bun run test:coverage       # build, type-check, smoke tests, complete source coverage and gate
 bun test --parallel=4 -t "pattern"  # run tests matching a name pattern
 ```
 
 Always verify with `bun run build && bun test --parallel=4` before committing schema changes. Avoid `--concurrent`, which makes individual tests concurrent and is blocked by the test-runner hook.
+
+Use `bun run test:coverage` for reliable coverage on Bun 1.4.0: its explicit entry
+loads all source tests in one module registry to avoid the worker merge bug.
+The gate includes every root library module, requires all functions and executable
+lines covered, and permits only the existing three-line compile-time `never`
+fallback in `common.ts`. Keep the raw LCOV report honest; do not add exclusions
+for uncovered production behavior. See the Development section of README.md.
 
 ## npm Publish
 

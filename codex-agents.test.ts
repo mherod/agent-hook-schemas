@@ -79,7 +79,7 @@ describe("Codex collaboration V2", () => {
   });
 
   test("messages and follow-up tasks have separate tool names and shared arguments", () => {
-    for (const tool_name of ["send_message", "followup_task"]) {
+    for (const tool_name of ["send_message", "followup_task"] as const) {
       const payload = { tool_name, tool_input: { target: "/root/review", message: "Please continue", future_option: 1 }, call_id: "call-1" };
       expect(codex.ParseCodexCollaborationV2ToolInput(payload)).toEqual({ success: true, data: payload });
       expect(codex.ParseCodexCollaborationV2ToolInput({ tool_name, tool_input: { target: "review", message: "" } }).success).toBe(false);
@@ -128,7 +128,7 @@ describe("Codex collaboration V2", () => {
 
 describe("Codex agent status", () => {
   test("accepts each tagged status without dropping host extensions", () => {
-    for (const status of ["pending_init", "running", "interrupted", "shutdown", "not_found", { completed: "Finished" }, { completed: null }, { errored: "Failed", future: true }]) {
+    for (const status of ["pending_init", "running", "interrupted", "shutdown", "not_found", { completed: "Finished" }, { completed: null }, { errored: "Failed", future: true }] as const) {
       expect(codex.CodexAgentStatusSchema.parse(status)).toEqual(status);
     }
   });
