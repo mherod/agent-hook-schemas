@@ -462,7 +462,7 @@ The gate requires **100% function coverage** and rejects every uncovered source
 line except the three-line `never` fallback in
 `sharedHookSpecificAdditionalContextSchema`. That branch is unreachable for the
 declared TypeScript parameter union. It remains visible in the raw report
-(currently **99.91% lines**); `common.ts` is included in coverage. The gate also
+(currently **99.92% lines**); `common.ts` is included in coverage. The gate also
 rejects missing modules. `bunfig.toml` supplies a 98% per-file line floor, and
 `scripts/check-coverage.ts` enforces the stricter line-by-line rule.
 
@@ -474,6 +474,14 @@ isolation. The coverage command requires Bun 1.4 or later.
 Coverage measures executed lines and functions, not branch coverage or complete
 provider protocol conformance. Optional local capture tests may skip when their
 `/private/tmp` files are absent; deterministic fixtures always run.
+
+Schema modules do not depend on integration helpers. Codex and Copilot use
+internal `codex-schemas.ts` and `copilot-schemas.ts` modules; their public platform
+entries continue to export the same schemas and helpers for compatibility.
+Integration code imports the internal schemas directly. The dependency test
+rejects runtime import cycles, and package smoke tests check root, platform and
+integration imports in fresh Node and Bun processes. Keep lazy schema `.options`
+access inside integration functions as an additional initialization safeguard.
 
 ## License
 

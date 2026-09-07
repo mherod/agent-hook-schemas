@@ -8,7 +8,7 @@ import {
   type CodexHookEventName,
   type CodexHooksConfig,
   type CodexMatcherGroup,
-} from "./codex.ts";
+} from "./codex-schemas.ts";
 import {
   defaultedTimeoutSec,
   mergeHookConfigLayers,

@@ -1,10 +1,26 @@
 /// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 
 // Smoke test: import from the built dist bundle (not source) to catch
 // module initialization order regressions like issues #4/#5/#13 where
 // schema values were undefined at bundle load time.
 describe("dist bundle smoke test", () => {
+  for (const runtime of ["node", process.execPath]) {
+    for (const entry of ["agent-hook-schemas", "agent-hook-schemas/codex", "agent-hook-schemas/copilot",
+      "agent-hook-schemas/codex-hooks-integration", "agent-hook-schemas/copilot-hooks-integration"]) {
+      test(`${runtime === "node" ? "Node" : "Bun"}: ${entry} initializes first in a fresh process`, () => {
+        const result = spawnSync(runtime, ["scripts/check-bundle-imports.mjs", entry], {
+          cwd: import.meta.dir,
+          encoding: "utf8",
+          timeout: 10_000,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr).toBe(0);
+      });
+    }
+  }
+
   test("all named exports from dist/index are defined", async () => {
     const dist = await import("./dist/index.js");
     for (const [key, value] of Object.entries(dist)) {

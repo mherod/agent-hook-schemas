@@ -7,7 +7,7 @@ import {
   type CopilotHookEventName,
   type CopilotHookHandler,
   type CopilotHooksConfig,
-} from "./copilot.ts";
+} from "./copilot-schemas.ts";
 import {
   defaultedTimeoutSec,
   mergeHookConfigLayers,

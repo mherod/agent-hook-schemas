@@ -39,7 +39,7 @@ bunx npm publish --otp=$(op item get "Npmjs" --otp)
 
 This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON across six platforms: **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, **Gemini CLI**, **Cursor**, and **Google Antigravity**.
 
-### Module layout (each is a separate subpath export via `package.json` `exports` + `tsup.config.ts` entry)
+### Module layout (public entries are listed in `package.json` exports and `tsup.config.ts`)
 
 - `antigravity.ts` — Google Antigravity `hooks.json` config, stdin/stdout schemas (5 events, camelCase), `ParseAntigravityHookInput()`
 - `antigravity-hooks-integration.ts` — `mergeAntigravityHooksFiles()`, `resolveMatchingAntigravityHandlers()`, matcher/timeout helpers
@@ -47,11 +47,13 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
 - `claude-tasks.ts` — Claude Code task management tool input/response schemas (TaskCreate, TaskUpdate, TaskGet, TaskList, TaskOutput, TaskStop)
 - `claude-agents.ts` — Claude Agent/Task, ListAgents and SendMessage decoded input schemas; unknown messaging protocols and outputs are not modeled
-- `codex.ts` — Codex event schemas (12 events), captured strict stdout and reference-derived loose stdout, command/MCP handlers, `mergeCodexHooksFiles()`, resolver
+- `codex.ts` — Public compatibility barrel for Codex schemas and integration helpers
+- `codex-schemas.ts` — Internal Codex event schemas (12 events), captured strict stdout and reference-derived loose stdout, command/MCP handlers and stdin parser
 - `codex-tasks.ts` — Codex `update_plan` argument, function-call envelope, and output schemas
 - `codex-agents.ts` — source-derived collaboration V1/V2 decoded input and response schemas; keep version-specific names and wait semantics separate
 - `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
-- `copilot.ts` — GitHub Copilot hook schemas (13 events), `CopilotHooksFileSchema`, `ParseCopilotHookInput()`, stdout schemas
+- `copilot.ts` — Public compatibility barrel for Copilot schemas and integration helpers
+- `copilot-schemas.ts` — Internal GitHub Copilot hook schemas (13 events), `CopilotHooksFileSchema`, stdin/stdout and directory parsers
 - `copilot-hooks-integration.ts` — `mergeCopilotHooksFiles()`, `resolveMatchingCopilotHandlers()`
 - `gemini.ts` — Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput()`
 - `gemini-hooks-integration.ts` — `mergeGeminiHooksFiles()`, `resolveMatchingGeminiHandlers()`
@@ -62,6 +64,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 
 ### Key patterns
 
+- **Acyclic schema dependencies** (Issue #15): Schema modules must not import or re-export integration modules. Codex/Copilot integrations import `codex-schemas.ts`/`copilot-schemas.ts` directly. The public `codex.ts`/`copilot.ts` barrels retain their existing helper exports for compatibility; do not import these barrels from the integrations. Claude/Gemini schema modules already have this dependency direction. Internal schema modules are not new package subpaths. `module-dependencies.test.ts` checks runtime cycles, and `dist-smoke.test.ts` checks built imports in fresh Node/Bun processes.
 - **`.loose()` for forward compatibility**: Input schemas use `.loose()` so unknown fields from future platform versions pass through without breaking parsing. This is intentional — do not replace with `.strict()`.
 - **Forward-compatible enums in input paths** (Issue #3): Enum fields in hook stdin use `.or(z.string())` to accept known values + unknown future values. Pattern:
   ```ts
