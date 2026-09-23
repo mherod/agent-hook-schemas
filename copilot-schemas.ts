@@ -24,6 +24,7 @@ export const CopilotCamelHookEventNames = [
   "subagentStart",
   "subagentStop",
   "userPromptSubmitted",
+  "userPromptTransformed",
 ] as const;
 
 export const CopilotCamelHookEventNameSchema = z.enum(CopilotCamelHookEventNames);
@@ -227,6 +228,7 @@ export const CopilotHooksConfigSchema = z
     subagentStart: CopilotHookHandlerListSchema,
     subagentStop: CopilotHookHandlerListSchema,
     userPromptSubmitted: CopilotHookHandlerListSchema,
+    userPromptTransformed: CopilotHookHandlerListSchema,
   })
   .partial()
   .superRefine((config, ctx) => {
@@ -348,6 +350,16 @@ export type CopilotCamelUserPromptSubmittedInput = z.infer<
   typeof CopilotCamelUserPromptSubmittedInputSchema
 >;
 
+/** No PascalCase alias is published for this event. */
+export const CopilotCamelUserPromptTransformedInputSchema =
+  CopilotCamelHookInputBaseSchema.extend({
+    prompt: z.string(),
+    transformedPrompt: z.string(),
+  }).loose();
+export type CopilotCamelUserPromptTransformedInput = z.infer<
+  typeof CopilotCamelUserPromptTransformedInputSchema
+>;
+
 export const CopilotCamelPreToolUseInputSchema = CopilotCamelHookInputBaseSchema.extend({
   toolName: z.string(),
   toolArgs: z.unknown().optional(),
@@ -439,6 +451,7 @@ export type CopilotCamelPreCompactInput = z.infer<typeof CopilotCamelPreCompactI
 export const CopilotCamelHookEventInputSchema = z.union([
   CopilotCamelSessionStartInputSchema,
   CopilotCamelSessionEndInputSchema,
+  CopilotCamelUserPromptTransformedInputSchema,
   CopilotCamelUserPromptSubmittedInputSchema,
   CopilotCamelPostToolUseInputSchema,
   CopilotCamelPostToolUseFailureInputSchema,
@@ -448,7 +461,18 @@ export const CopilotCamelHookEventInputSchema = z.union([
   CopilotCamelErrorOccurredInputSchema,
   CopilotCamelPreCompactInputSchema,
   CopilotCamelPreToolUseInputSchema,
-]);
+]).superRefine((input, ctx) => {
+  // A transformed prompt also resembles userPromptSubmitted. Do not let that
+  // broader branch hide malformed fields on the more specific event.
+  if ("transformedPrompt" in input) {
+    const parsed = CopilotCamelUserPromptTransformedInputSchema.safeParse(input);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        ctx.addIssue({ code: "custom", path: issue.path, message: issue.message });
+      }
+    }
+  }
+});
 export type CopilotCamelHookEventInput = z.infer<typeof CopilotCamelHookEventInputSchema>;
 
 // ---------------------------------------------------------------------------
@@ -729,6 +753,18 @@ export const CopilotPostToolUseStdoutSchema = z.object({
 }).strict();
 export type CopilotPostToolUseStdout = z.infer<typeof CopilotPostToolUseStdoutSchema>;
 
+/** Only SDK programmatic submitted-prompt hooks honor this replacement. */
+export const CopilotUserPromptSubmittedStdoutSchema = z.object({
+  modifiedPrompt: z.string().min(1).optional(),
+}).strict();
+export type CopilotUserPromptSubmittedStdout = z.infer<typeof CopilotUserPromptSubmittedStdoutSchema>;
+
+/** Rewrites model-facing content without blocking the turn or changing timeline text. */
+export const CopilotUserPromptTransformedStdoutSchema = z.object({
+  modifiedTransformedPrompt: z.string().min(1).optional(),
+}).strict();
+export type CopilotUserPromptTransformedStdout = z.infer<typeof CopilotUserPromptTransformedStdoutSchema>;
+
 /** Display-only lines, distinct from the final decision JSON. */
 export const CopilotHookProgressSchema = z.object({
   type: z.literal("progress"),
@@ -738,6 +774,8 @@ export const CopilotHookProgressSchema = z.object({
 export type CopilotHookProgress = z.infer<typeof CopilotHookProgressSchema>;
 
 export const CopilotHookOutputSchema = z.union([
+  CopilotUserPromptSubmittedStdoutSchema,
+  CopilotUserPromptTransformedStdoutSchema,
   CopilotPostToolUseStdoutSchema,
   CopilotPreToolUseStdoutSchema,
   CopilotAgentStopStdoutSchema,

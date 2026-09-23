@@ -60,11 +60,13 @@ export function mergeCopilotHooksDirectoryFiles(files: unknown[]) {
 const COPILOT_MATCHER_EVENTS: ReadonlySet<CopilotHookEventName> = new Set([
   "Notification",
   "PermissionRequest",
+  "PostToolUse",
   "PreCompact",
   "PreToolUse",
   "SubagentStart",
   "notification",
   "permissionRequest",
+  "postToolUse",
   "preCompact",
   "preToolUse",
   "subagentStart",
@@ -76,6 +78,25 @@ const COPILOT_MATCHER_EVENTS: ReadonlySet<CopilotHookEventName> = new Set([
  */
 export function copilotMatcherMatches(matcher: string | undefined, subject: string): boolean {
   return regexMatcherMatches(matcher, subject, { wildcard: false, anchored: true });
+}
+
+const COPILOT_CLAUDE_TOOL_NAMES = new Map([
+  ["bash", "Bash"], ["powershell", "Bash"], ["view", "Read"], ["create", "Write"],
+  ["edit", "Edit"], ["str_replace_editor", "Edit"], ["apply_patch", "Edit"],
+  ["grep", "Grep"], ["rg", "Grep"], ["glob", "Glob"], ["web_fetch", "WebFetch"],
+  ["web_search", "WebSearch"], ["ask_user", "AskUserQuestion"],
+  ["update_todo", "TodoWrite"], ["task", "Agent"],
+]);
+
+/** PascalCase PreToolUse alone uses Claude aliases and wildcard semantics. */
+function copilotClaudePreToolMatcherMatches(matcher: string | undefined, subject: string): boolean {
+  if (!matcher || matcher === "*" || matcher === "**") return true;
+  const canonical = COPILOT_CLAUDE_TOOL_NAMES.get(subject) ?? subject;
+  if (/^[\w-]+(?:\|[\w-]+)*$/.test(matcher)) {
+    return matcher.split("|").some((token) =>
+      token === subject || token === canonical || (token === "Task" && canonical === "Agent"));
+  }
+  return copilotMatcherMatches(matcher, canonical);
 }
 
 /** Runtime transport policy; allowLocalhost represents COPILOT_HOOK_ALLOW_LOCALHOST=1. */
@@ -104,6 +125,9 @@ export function resolveMatchingCopilotHandlers(
   const handlers = config[event];
   if (!handlers?.length) return [];
   if (!copilotEventUsesMatcher(event)) return handlers;
+  if (event === "PreToolUse") {
+    return handlers.filter((handler) => copilotClaudePreToolMatcherMatches(handler.matcher, subject));
+  }
   return handlers.filter((handler) => copilotMatcherMatches(handler.matcher, subject));
 }
 
@@ -126,8 +150,10 @@ export function copilotResolutionSubjectFromInput(
       return stringField(record, "notification_type");
     case "PermissionRequest":
     case "PreToolUse":
+    case "PostToolUse":
     case "permissionRequest":
     case "preToolUse":
+    case "postToolUse":
       return stringField(record, "toolName", "tool_name");
     case "PreCompact":
     case "preCompact":
@@ -170,6 +196,9 @@ export function copilotEventNameFromInput(
     return "postToolUse";
   }
   if (typeof record.toolName === "string") return "preToolUse";
+  if (typeof record.transformedPrompt === "string" && typeof record.prompt === "string") {
+    return "userPromptTransformed";
+  }
   if (typeof record.prompt === "string") return "userPromptSubmitted";
   if (typeof record.reason === "string") return "sessionEnd";
   if (typeof record.source === "string") return "sessionStart";

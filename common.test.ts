@@ -53,8 +53,14 @@ describe("agent-hook-schemas/common", () => {
     expect(ToolCallCoreSchema.safeParse({ tool_name: "Bash", tool_input: [] }).success).toBe(false);
   });
 
-  test("SharedHookSpecificPreToolUseOutputSchema is identical to HookSpecificPreToolUseOutputSchema", () => {
-    expect(SharedHookSpecificPreToolUseOutputSchema).toBe(HookSpecificPreToolUseOutputSchema);
+  test("Claude permits context-only PreToolUse output without weakening the shared contract", () => {
+    const context = { hookEventName: "PreToolUse", additionalContext: "Check formatting" };
+    expect(HookSpecificPreToolUseOutputSchema.safeParse(context).success).toBe(true);
+    expect(SharedHookSpecificPreToolUseOutputSchema.safeParse(context).success).toBe(false);
+    const decision = { ...context, permissionDecision: "allow" };
+    expect(HookSpecificPreToolUseOutputSchema.parse(decision)).toEqual(
+      SharedHookSpecificPreToolUseOutputSchema.parse(decision),
+    );
   });
 
   test("SharedCommandMatcherGroupSchema accepts command-only matcher groups", () => {

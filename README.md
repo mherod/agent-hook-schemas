@@ -185,15 +185,32 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 
 ## Reference updates (September 2026)
 
+The [September 21 audit](docs/hook-docs-audit-2026-09-21.md) records the current
+official sources and verification limits. Claude inputs now type MCP provenance,
+prompt/session metadata, streaming display fields, and background task summaries.
+Outputs accept classifier context, prompt title/suppression fields, context-only
+PreToolUse responses, and Stop/SubagentStop feedback. Codex wire schemas retain
+their captured contracts.
+
+Copilot now includes `userPromptTransformed` configuration, input inference, and
+`CopilotUserPromptTransformedStdoutSchema` for `modifiedTransformedPrompt`.
+It rewrites model-facing content without blocking the turn. The separate
+`CopilotUserPromptSubmittedStdoutSchema` models `modifiedPrompt`, which the
+runtime honors only for SDK programmatic hooks. Empty replacements are rejected.
+PascalCase `PreToolUse` resolves Claude tool aliases and `*`/`**` wildcards;
+native camelCase events retain anchored regex matching. `postToolUse` now filters
+on the tool name as documented.
+
 ### Agent tools
 
-`ClaudeCodeBuiltinToolNameSchema` now recognizes all 45 names in the
+`ClaudeCodeBuiltinToolNameSchema` now recognizes all 46 names in the
 [Claude tools reference](https://code.claude.com/docs/en/tools-reference), checked
-on September 7, 2026. This is a catalog, not a guarantee that every tool is enabled
+on September 21, 2026, including `SubagentHandback` (Claude Code v2.1.271+).
+This is a catalog, not a guarantee that every tool is enabled
 in a session. Generic hook parsing still accepts unknown tool names.
 
 `AgentToolInputSchema` follows the optional `subagent_type` and new metadata fields
-in [Agent SDK 0.3.263](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk/v/0.3.263):
+in [Agent SDK 0.3.278](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk/v/0.3.278):
 `name`, `run_in_background`, and `isolation`. It preserves deprecated `team_name`
 and `mode`, optional descriptions from older payloads, and future fields and model
 names. `ClaudeAgentToolInputSchema` also accepts the legacy `Task` name.
@@ -218,6 +235,8 @@ remain runtime checks.
 
 Codex collaboration schemas are based on the
 [rust-v0.153.4 tool definitions](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/src/tools/handlers/multi_agents_spec.rs).
+That tool-definition file is unchanged in stable `rust-v0.155.1`, checked on
+September 21. This comparison does not establish unchanged runtime behavior.
 Choose the version exposed by your host:
 
 | Contract | V1 | V2 |
@@ -302,10 +321,10 @@ References: [Claude](https://code.claude.com/docs/en/hooks),
 
 | | Claude Code | Codex | Copilot | Gemini CLI | Cursor | Google Antigravity |
 |---|---|---|---|---|---|---|
-| **Events** | 33 events | 12 events | 13 events, camelCase or VS-compatible | 11 events | 21 events | 5 events (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`) |
+| **Events** | 33 events | 12 events | 14 events; `userPromptTransformed` has only a documented camelCase name | 11 events | 21 events | 5 events (`PreToolUse`, `PostToolUse`, `PreInvocation`, `PostInvocation`, `Stop`) |
 | **Stdin style** | Loose (`.loose()`) | Loose (`.loose()`) | Loose; camelCase or `hook_event_name` | Loose (`.loose()`) | Loose (`.loose()`) | Loose (`.loose()`, camelCase) |
 | **Handler types** | command, http, mcp_tool, prompt, agent | command, mcp_tool | command (shell or exec), http, prompt | command only | command, prompt (cloud: command only) | command only |
-| **Matcher** | Exact names/lists or regex; event-aware | Regex on subject and tool aliases | Anchored regex on selected events | Regex (tool) / exact (lifecycle) | String matcher in config | Regex on tool name (tool events) / flat array (invocation/stop) |
+| **Matcher** | Exact names/lists or regex; event-aware | Regex on subject and tool aliases | Anchored regex; PascalCase PreToolUse also supports Claude aliases/wildcards | Regex (tool) / exact (lifecycle) | String matcher in config | Regex on tool name (tool events) / flat array (invocation/stop) |
 | **`if` guard** | `Tool(glob)` on tool input | `Bash(glob)` only | No | No | No | No |
 | **Config merge** | Yes (`disableAllHooks` resets) | Yes (concatenate) | Yes (concatenate; disabled file skipped) | Yes (concatenate) | No | Yes (named hook specs merge, handler arrays concatenate) |
 | **Stdout strictness** | Broad output loose; selected event outputs strict | Captured wires strict; reference-derived events loose | Strict event-specific outputs | Loose | Strict event-specific outputs | Loose |

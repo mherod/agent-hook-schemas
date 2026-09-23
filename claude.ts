@@ -12,6 +12,7 @@ import {
   SharedHookSpecificPostToolUseOutputSchema,
   SharedHookSpecificPreToolUseOutputSchema,
   SharedHookSpecificSessionStartOutputSchema,
+  SharedHookSpecificStopOutputSchema,
   SharedHookSpecificUserPromptSubmitOutputSchema,
   ToolCallCoreSchema,
   sharedHookSpecificAdditionalContextSchema,
@@ -229,7 +230,7 @@ export const PermissionDestinationSchema = z.enum([
 export type PermissionDestination = z.infer<typeof PermissionDestinationSchema>;
 
 /**
- * Built-in Claude Code tool names from the tools reference (2026-09-07).
+ * Built-in Claude Code tool names from the tools reference (2026-09-21).
  * Availability depends on the version, model, provider and session settings. MCP tools use
  * {@link McpToolNamePattern} instead (`mcp__<server>__<tool>`).
  */
@@ -266,6 +267,7 @@ export const ClaudeCodeBuiltinToolNameSchema = z.enum([
   "SendUserFile",
   "ShareOnboardingGuide",
   "Skill",
+  "SubagentHandback",
   "TaskCreate",
   "TaskGet",
   "TaskList",
@@ -398,16 +400,25 @@ export const EffortLevelSchema = z.enum(["low", "medium", "high", "xhigh", "max"
 export type EffortLevel = z.infer<typeof EffortLevelSchema>;
 
 export const HookEffortSchema = z.object({
-  level: EffortLevelSchema,
-});
+  level: EffortLevelSchema.or(z.string()),
+}).loose();
 export type HookEffort = z.infer<typeof HookEffortSchema>;
+
+/** MCP provenance from Agent SDK 0.3.278; source is an open vocabulary. */
+export const McpServerProvenanceSchema = z.object({
+  name: z.string(),
+  source: z.string(),
+}).loose();
+export type McpServerProvenance = z.infer<typeof McpServerProvenanceSchema>;
 
 /** Shared stdin fields for most hook events (+ optional subagent context). All fields optional for resilient parsing. */
 export const HookInputBaseSchema = z
   .object({
     session_id: z.string().optional(),
+    prompt_id: z.string().optional(),
     transcript_path: z.string().optional(),
     cwd: z.string().optional(),
+    scratchpad_dir: z.string().optional(),
     permission_mode: PermissionModeInputSchema.optional(),
     effort: HookEffortSchema.optional(),
   })
@@ -442,6 +453,11 @@ const TaskTimelinePayloadSchema = z.object({
 export const SessionStartInputSchema = hookStdinLoose("SessionStart", {
   source: SessionStartSourceInputSchema.optional(),
   model: z.string().optional(),
+  session_title: z.string().optional(),
+  seconds_since_last_response: z.number().optional(),
+  context_tokens: z.number().optional(),
+  prompt_cache_likely_expired: OptionalBooleanField,
+  estimated_cache_write_usd: z.number().optional(),
 });
 export type SessionStartInput = z.infer<typeof SessionStartInputSchema>;
 
@@ -462,6 +478,8 @@ export type InstructionsLoadedInput = z.infer<typeof InstructionsLoadedInputSche
 
 export const UserPromptSubmitInputSchema = hookStdinLoose("UserPromptSubmit", {
   prompt: z.string().optional(),
+  source: z.enum(["user", "sdk", "system", "loop_wakeup", "schedule_wakeup", "poll_event"]).or(z.string()).optional(),
+  session_title: z.string().optional(),
 });
 export type UserPromptSubmitInput = z.infer<typeof UserPromptSubmitInputSchema>;
 
@@ -478,7 +496,10 @@ export const PreToolUseInputSchema = HookInputBaseSchema.extend({
   hook_event_name: z.literal("PreToolUse"),
 })
   .extend(ToolCallCoreSchema.partial().shape)
-  .extend({ tool_use_id: z.string().optional() })
+  .extend({
+    tool_use_id: z.string().optional(),
+    mcp_server: McpServerProvenanceSchema.optional(),
+  })
   .loose();
 export type PreToolUseInput = z.infer<typeof PreToolUseInputSchema>;
 
@@ -488,6 +509,7 @@ export const PermissionRequestInputSchema = HookInputBaseSchema.extend({
   .extend(ToolCallCoreSchema.partial().shape)
   .extend({
     permission_suggestions: z.array(PermissionSuggestionSchema).optional(),
+    mcp_server: McpServerProvenanceSchema.optional(),
   })
   .loose();
 export type PermissionRequestInput = z.infer<typeof PermissionRequestInputSchema>;
@@ -500,6 +522,7 @@ export const PostToolUseInputSchema = HookInputBaseSchema.extend({
     tool_response: JsonObjectSchema.optional(),
     tool_use_id: z.string().optional(),
     duration_ms: z.number().optional(),
+    mcp_server: McpServerProvenanceSchema.optional(),
   })
   .loose();
 export type PostToolUseInput = z.infer<typeof PostToolUseInputSchema>;
@@ -508,8 +531,8 @@ const ToolCallWithResponseSchema = z.object({
   tool_name: z.string(),
   tool_input: JsonObjectSchema,
   tool_use_id: z.string(),
-  tool_response: z.string(),
-});
+  tool_response: z.unknown().optional(),
+}).loose();
 export type ToolCallWithResponse = z.infer<typeof ToolCallWithResponseSchema>;
 
 export const PostToolBatchInputSchema = HookInputBaseSchema.extend({
@@ -529,6 +552,8 @@ export const PostToolUseFailureInputSchema = HookInputBaseSchema.extend({
     tool_use_id: z.string().optional(),
     error: z.string().optional(),
     is_interrupt: OptionalBooleanField,
+    duration_ms: z.number().optional(),
+    mcp_server: McpServerProvenanceSchema.optional(),
   })
   .loose();
 export type PostToolUseFailureInput = z.infer<typeof PostToolUseFailureInputSchema>;
@@ -540,6 +565,7 @@ export const PermissionDeniedInputSchema = HookInputBaseSchema.extend({
   .extend({
     tool_use_id: z.string().optional(),
     reason: z.string().optional(),
+    mcp_server: McpServerProvenanceSchema.optional(),
   })
   .loose();
 export type PermissionDeniedInput = z.infer<typeof PermissionDeniedInputSchema>;
@@ -557,9 +583,36 @@ export type NotificationInput = z.infer<typeof NotificationInputSchema>;
  * unchanged). Default timeout 10s.
  */
 export const MessageDisplayInputSchema = hookStdinLoose("MessageDisplay", {
+  turn_id: z.string().optional(),
+  message_id: z.string().optional(),
+  index: z.number().optional(),
+  final: OptionalBooleanField,
+  delta: z.string().optional(),
+  // Retain the earlier captured spelling.
   message_text: z.string().optional(),
 });
 export type MessageDisplayInput = z.infer<typeof MessageDisplayInputSchema>;
+
+export const BackgroundTaskSummarySchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  description: z.string(),
+  command: z.string().optional(),
+  agent_type: z.string().optional(),
+  server: z.string().optional(),
+  tool: z.string().optional(),
+  name: z.string().optional(),
+}).loose();
+export type BackgroundTaskSummary = z.infer<typeof BackgroundTaskSummarySchema>;
+
+export const SessionCronSummarySchema = z.object({
+  id: z.string(),
+  schedule: z.string(),
+  recurring: z.boolean(),
+  prompt: z.string(),
+}).loose();
+export type SessionCronSummary = z.infer<typeof SessionCronSummarySchema>;
 
 export const SubagentStartInputSchema = hookStdinLoose("SubagentStart", {
   agent_id: z.string().optional(),
@@ -573,6 +626,8 @@ export const SubagentStopInputSchema = hookStdinLoose("SubagentStop", {
   agent_type: z.string().optional(),
   agent_transcript_path: z.string().optional(),
   last_assistant_message: z.string().optional(),
+  background_tasks: z.array(BackgroundTaskSummarySchema).optional(),
+  session_crons: z.array(SessionCronSummarySchema).optional(),
 });
 export type SubagentStopInput = z.infer<typeof SubagentStopInputSchema>;
 
@@ -593,6 +648,8 @@ export type TaskCompletedInput = z.infer<typeof TaskCompletedInputSchema>;
 export const StopInputSchema = hookStdinLoose("Stop", {
   stop_hook_active: OptionalBooleanField,
   last_assistant_message: z.string().optional(),
+  background_tasks: z.array(BackgroundTaskSummarySchema).optional(),
+  session_crons: z.array(SessionCronSummarySchema).optional(),
 });
 export type StopInput = z.infer<typeof StopInputSchema>;
 
@@ -645,7 +702,7 @@ export type DirectoryAddedInput = z.infer<typeof DirectoryAddedInputSchema>;
 
 export const PreCompactInputSchema = hookStdinLoose("PreCompact", {
   trigger: CompactTriggerSchema.optional(),
-  custom_instructions: z.string().optional(),
+  custom_instructions: z.string().nullable().optional(),
 });
 export type PreCompactInput = z.infer<typeof PreCompactInputSchema>;
 
@@ -792,7 +849,7 @@ function isSharedHookEventName(name: HookEventName): name is z.infer<typeof Shar
 /** `hookSpecificOutput` with optional `additionalContext` (shared with Codex stdout for overlapping events). */
 export function HookSpecificAdditionalContextSchema<const N extends HookEventName>(hookEventName: N) {
   if (hookEventName === "PreToolUse") {
-    return SharedHookSpecificPreToolUseOutputSchema;
+    return HookSpecificPreToolUseOutputSchema;
   }
   if (isSharedHookEventName(hookEventName)) {
     return sharedHookSpecificAdditionalContextSchema(
@@ -810,7 +867,9 @@ const HookSpecificElicitationBodySchema = z.object({
   content: JsonObjectSchema.optional(),
 });
 
-export const HookSpecificPreToolUseOutputSchema = SharedHookSpecificPreToolUseOutputSchema;
+export const HookSpecificPreToolUseOutputSchema = SharedHookSpecificPreToolUseOutputSchema.extend({
+  permissionDecision: PreToolPermissionDecisionSchema.optional(),
+});
 export type HookSpecificPreToolUseOutput = z.infer<typeof HookSpecificPreToolUseOutputSchema>;
 
 export const HookSpecificPermissionRequestOutputSchema = BaseHookSpecificOutputSchema.extend({
@@ -849,12 +908,19 @@ export const HookSpecificSessionStartOutputSchema = z
 export type HookSpecificSessionStartOutput = z.infer<typeof HookSpecificSessionStartOutputSchema>;
 
 export const HookSpecificUserPromptSubmitOutputSchema =
-  SharedHookSpecificUserPromptSubmitOutputSchema;
+  SharedHookSpecificUserPromptSubmitOutputSchema.extend({
+    sessionTitle: z.string().optional(),
+    suppressOriginalPrompt: OptionalBooleanField,
+  });
 export type HookSpecificUserPromptSubmitOutput = z.infer<
   typeof HookSpecificUserPromptSubmitOutputSchema
 >;
 
-export const HookSpecificPostToolUseOutputSchema = SharedHookSpecificPostToolUseOutputSchema;
+export const HookSpecificPostToolUseOutputSchema = SharedHookSpecificPostToolUseOutputSchema.extend({
+  // The runtime validates built-in replacements against the particular tool's output.
+  updatedToolOutput: z.unknown().optional(),
+  classifierContext: z.string().optional(),
+});
 export type HookSpecificPostToolUseOutput = z.infer<typeof HookSpecificPostToolUseOutputSchema>;
 
 export const HookSpecificPostToolUseFailureOutputSchema =
@@ -866,6 +932,15 @@ export type HookSpecificPostToolUseFailureOutput = z.infer<
 export const HookSpecificSubagentStartOutputSchema =
   HookSpecificAdditionalContextSchema("SubagentStart");
 export type HookSpecificSubagentStartOutput = z.infer<typeof HookSpecificSubagentStartOutputSchema>;
+
+export const HookSpecificStopOutputSchema = SharedHookSpecificStopOutputSchema;
+export type HookSpecificStopOutput = z.infer<typeof HookSpecificStopOutputSchema>;
+
+export const HookSpecificSubagentStopOutputSchema = z.object({
+  hookEventName: z.literal("SubagentStop"),
+  additionalContext: z.string().optional(),
+}).strict();
+export type HookSpecificSubagentStopOutput = z.infer<typeof HookSpecificSubagentStopOutputSchema>;
 
 export const HookSpecificNotificationOutputSchema =
   HookSpecificAdditionalContextSchema("Notification");
@@ -901,6 +976,7 @@ export const HookSpecificUserPromptExpansionOutputSchema =
   BaseHookSpecificOutputSchema.extend({
     hookEventName: z.literal("UserPromptExpansion"),
     additionalContext: z.string().optional(),
+    suppressOriginalPrompt: OptionalBooleanField,
   });
 export type HookSpecificUserPromptExpansionOutput = z.infer<
   typeof HookSpecificUserPromptExpansionOutputSchema
@@ -954,6 +1030,8 @@ export const HookSpecificOutputSchema = z.union([
   HookSpecificPostToolUseFailureOutputSchema,
   HookSpecificMessageDisplayOutputSchema,
   HookSpecificSubagentStartOutputSchema,
+  HookSpecificStopOutputSchema,
+  HookSpecificSubagentStopOutputSchema,
   HookSpecificNotificationOutputSchema,
   HookSpecificElicitationOutputSchema,
   HookSpecificElicitationResultOutputSchema,

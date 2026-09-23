@@ -53,7 +53,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 - `codex-agents.ts` — source-derived collaboration V1/V2 decoded input and response schemas; keep version-specific names and wait semantics separate
 - `codex-hooks-integration.ts` — Codex integration helpers with `if` guard support
 - `copilot.ts` — Public compatibility barrel for Copilot schemas and integration helpers
-- `copilot-schemas.ts` — Internal GitHub Copilot hook schemas (13 events), `CopilotHooksFileSchema`, stdin/stdout and directory parsers
+- `copilot-schemas.ts` — Internal GitHub Copilot hook schemas (14 events), `CopilotHooksFileSchema`, stdin/stdout and directory parsers
 - `copilot-hooks-integration.ts` — `mergeCopilotHooksFiles()`, `resolveMatchingCopilotHandlers()`
 - `gemini.ts` — Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput()`
 - `gemini-hooks-integration.ts` — `mergeGeminiHooksFiles()`, `resolveMatchingGeminiHandlers()`

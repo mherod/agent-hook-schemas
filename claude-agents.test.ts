@@ -16,12 +16,12 @@ describe("Claude agent tool reference updates", () => {
       "ListMcpResourcesTool", "LSP", "Monitor", "NotebookEdit", "PowerShell",
       "PushNotification", "ReadMcpResourceTool", "RemoteTrigger", "ReportFindings",
       "ScheduleWakeup", "SendFeedback", "SendMessage", "SendUserFile",
-      "ShareOnboardingGuide", "Skill", "TodoWrite", "WaitForMcpServers", "Workflow",
+      "ShareOnboardingGuide", "Skill", "SubagentHandback", "TodoWrite", "WaitForMcpServers", "Workflow",
     ];
     for (const name of additions) {
       expect(ClaudeCodeBuiltinToolNameSchema.safeParse(name).success, name).toBe(true);
     }
-    expect(ClaudeCodeBuiltinToolNameSchema.options).toHaveLength(45);
+    expect(ClaudeCodeBuiltinToolNameSchema.options).toHaveLength(46);
     for (const name of ["Bash", "Agent", "Read", "TaskCreate", "TaskStop", "WebSearch"]) {
       expect(ClaudeCodeBuiltinToolNameSchema.safeParse(name).success).toBe(true);
     }

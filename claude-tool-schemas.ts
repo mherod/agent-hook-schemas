@@ -187,7 +187,7 @@ export const ToolSearchToolResponseSchema = z
   .loose();
 export type ToolSearchToolResponse = z.infer<typeof ToolSearchToolResponseSchema>;
 
-/** Agent SDK 0.3.263 AgentInput, with permissive compatibility fields. */
+/** Agent SDK 0.3.278 AgentInput, with permissive compatibility fields. */
 export const AgentToolInputSchema = z.object({
   prompt: z.string(),
   // Keep description optional for compatibility with existing captures.

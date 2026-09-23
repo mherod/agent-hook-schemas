@@ -47,6 +47,19 @@ describe("dist bundle smoke test", () => {
     expect(HookEventNameSchema.options.length).toBeGreaterThan(0);
   });
 
+  test("September reference additions work through built root and provider entries", async () => {
+    const root = await import("agent-hook-schemas");
+    const claude = await import("agent-hook-schemas/claude");
+    const copilot = await import("agent-hook-schemas/copilot");
+    const output = { hookSpecificOutput: { hookEventName: "Stop", additionalContext: "Run tests" } } as const;
+    expect(root.HookCommandOutputSchema.parse(output)).toEqual(output);
+    expect(claude.HookCommandOutputSchema.parse(output)).toEqual(output);
+    expect(claude.ClaudeCodeBuiltinToolNameSchema.parse("SubagentHandback")).toBe("SubagentHandback");
+    const replacement = { modifiedTransformedPrompt: "Expanded prompt" };
+    expect(root.CopilotUserPromptTransformedStdoutSchema.parse(replacement)).toEqual(replacement);
+    expect(copilot.ParseCopilotHookOutput(replacement)).toEqual({ success: true, data: replacement });
+  });
+
   test("CodexHookEventNameSchema.options is non-empty at bundle load", async () => {
     const { CodexHookEventNameSchema } = await import("./dist/codex.js");
     expect(CodexHookEventNameSchema.options.length).toBeGreaterThan(0);
