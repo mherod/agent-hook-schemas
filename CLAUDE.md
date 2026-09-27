@@ -41,7 +41,8 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
 
 ### Module layout (public entries are listed in `package.json` exports and `tsup.config.ts`)
 
-- `antigravity.ts` — Google Antigravity `hooks.json` config, stdin/stdout schemas (5 events, camelCase), `ParseAntigravityHookInput()`
+- `antigravity.ts` — Google Antigravity `hooks.json` config, stdin/stdout schemas (5 events, camelCase), `ParseAntigravityHookInput()`, tool re-exports
+- `antigravity-tool-schemas.ts` — 14 native built-in Antigravity tool schemas, input/response types, `AntigravityTypedToolCallSchema`, and `ParseAntigravityToolArgs`
 - `antigravity-hooks-integration.ts` — `mergeAntigravityHooksFiles()`, `resolveMatchingAntigravityHandlers()`, matcher/timeout helpers
 - `claude.ts` — Claude Code event schemas (33 events), tool input/response schemas, settings schema, `ParseHookInput()` discriminated union parser, stdout schemas
 - `claude-hooks-integration.ts` — `mergeClaudeHooksFiles()`, `resolveMatchingClaudeHandlers()`, matcher/`if` guard evaluation
@@ -73,7 +74,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
   // Use EnumNameInputSchema in hook input schemas, keep EnumNameSchema for outputs/settings
   ```
   This enables downstream consumers to accept future enum values without requiring package version bumps. See commit 514179c for full implementation examples in claude.ts and gemini.ts.
-- **Discriminated unions**: `HookEventInputSchema` discriminates on `hook_event_name`; `ReadToolResponseSchema` on `type`; `HookHandlerSchema` on handler `type`; `TaskToolInputSchema` on `tool_name`.
+- **Discriminated unions**: `HookEventInputSchema` discriminates on `hook_event_name`; `ReadToolResponseSchema` on `type`; `HookHandlerSchema` on handler `type`; `TaskToolInputSchema` on `tool_name`; `AntigravityTypedToolCallSchema` on `name`.
 - **Fallback catch-all schemas**: Unknown hook event types use fallback schemas with `.refine()` guard to ensure known event types still validate their specific schemas:
   ```ts
   const UnknownHookEventInputSchema = HookInputBaseSchema.extend({
@@ -84,6 +85,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
   }).loose();
   ```
 - **Per-platform Parse functions**: Each platform exports a top-level `Parse*HookInput()` that returns `z.SafeParseReturnType` — one-call parsing of unknown stdin JSON.
+- **Antigravity tool schemas**: `antigravity-tool-schemas.ts` models 14 native built-in tools (`view_file`, `replace_file_content`, `write_to_file`, `run_command`, `read_url_content`, `search_web`, `manage_task`, `schedule`, `generate_image`, `ask_question`, `invoke_subagent`, `define_subagent`, `manage_subagents`, `send_message`), plus MCP tools (`call_mcp_tool`, `list_resources`, `read_resource`). Inputs use `.loose()`. Dual exports provide both `*ToolInputSchema` and `*ArgsSchema` aliases. `ParseAntigravityToolArgs` dispatches typed parsing and requires 100% test branch coverage to satisfy `scripts/check-coverage.ts`.
 - **All fields optional on input base schemas**: `HookInputBaseSchema` and `CodexHookInputBaseSchema` have all fields optional for resilient parsing of partial payloads.
 - **Lazy evaluation in integration modules** (Issues #4, #13): Never access `SomeSchema.options` at module level in `*-hooks-integration.ts` files. tsup/esbuild chunk splitting causes the schema chunk to be uninitialized when the integration module runs, yielding `undefined`. Always access `.options` inside the function body:
   ```ts
@@ -96,7 +98,7 @@ This is a Zod v4 schema library for AI coding assistant hook stdin/stdout JSON a
     return mergeHookConfigLayers({ ..., events: claudeHookEvents });
   }
   ```
-  This applies to all three integration files: `claude-hooks-integration.ts`, `codex-hooks-integration.ts`, `gemini-hooks-integration.ts`.
+  This applies to all integration files: `claude-hooks-integration.ts`, `codex-hooks-integration.ts`, `gemini-hooks-integration.ts`, `copilot-hooks-integration.ts`, `antigravity-hooks-integration.ts`.
 
 ### Schema Consolidation & Public `./common` Surface
 
@@ -154,80 +156,6 @@ test("hello world", () => {
   expect(1).toBe(1);
 });
 ```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
 ## Codex Capture Schemas
 
