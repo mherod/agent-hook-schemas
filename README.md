@@ -4,6 +4,21 @@
 
 Supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://github.com/openai/codex), GitHub Copilot CLI / cloud agent hooks, [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Cursor](https://www.cursor.com/), and [Google Antigravity](https://www.antigravity.google).
 
+## Features
+
+- **Multi-Platform Coverage** — Typed schemas for Claude Code (33 events), OpenAI Codex (12 events), GitHub Copilot (14 events), Gemini CLI (11 events), Cursor (21 events), and Google Antigravity (5 events).
+- **Single-Call Input Parsers** — `ParseHookInput()`, `ParseCodexHookInput()`, `ParseCopilotHookInput()`, `ParseGeminiHookInput()`, `ParseCursorHookInput()`, and `ParseAntigravityHookInput()` validate incoming payloads into discriminated TypeScript types in one call.
+- **Built-in Tool & Agent Schemas** — Complete argument and response validation for 46 Claude Code tools, 14 Google Antigravity built-in tools, Codex collaboration (V1 & V2) and `update_plan`, and Claude task management tools (`TaskCreate`, `TaskUpdate`, etc.).
+- **Config Merging & Resolution** — Layered configuration mergers (`mergeClaudeHooksFiles`, `mergeCodexHooksFiles`, `mergeCopilotHooksFiles`, `mergeGeminiHooksFiles`, `mergeAntigravityHooksFiles`) that combine user, workspace, and plugin settings in priority order with regex matchers and `if` guards.
+- **Forward-Compatible Design** — Uses `.loose()` on input payloads so future platform versions with new metadata fields pass through without breaking validation.
+- **Zero External Runtime Overhead** — Written in pure TypeScript with `zod` v4+ as the sole dependency; outputs dual-published ESM and `.d.ts` type declarations.
+
+## Prerequisites
+
+- **Runtime**: [Node.js](https://nodejs.org/) v18.0.0+ or [Bun](https://bun.sh/) v1.1.0+ (Bun 1.4+ recommended for local development and test coverage)
+- **Dependencies**: `zod` v4.0.0+
+- **Peer Dependencies**: `typescript` v5.0.0+ (for consumer TypeScript projects)
+
 ## Install
 
 ```bash
@@ -168,14 +183,16 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 | Import | Description |
 |--------|-------------|
 | `agent-hook-schemas` | Root barrel — re-exports Claude, Codex, Copilot, Cursor, Gemini, Antigravity, and integration modules |
-| `agent-hook-schemas/antigravity` | Google Antigravity `hooks.json` config, stdin/stdout schemas, `ParseAntigravityHookInput` |
+| `agent-hook-schemas/antigravity` | Google Antigravity `hooks.json` config, stdin/stdout schemas, 14 built-in tool schemas & parsers, `ParseAntigravityHookInput` |
 | `agent-hook-schemas/antigravity-hooks-integration` | `mergeAntigravityHooksFiles`, `resolveMatchingAntigravityHandlers`, matcher/timeout helpers |
 | `agent-hook-schemas/claude` | Claude Code event schemas, tool input parsers, handler types, stdout schemas |
 | `agent-hook-schemas/claude-agents` | Claude `Agent` / legacy `Task`, `ListAgents`, and `SendMessage` input schemas and parsers |
 | `agent-hook-schemas/claude-hooks-integration` | `mergeClaudeHooksFiles`, `resolveMatchingClaudeHandlers`, matcher/if helpers |
+| `agent-hook-schemas/claude-tasks` | Claude Code task management tool input/response schemas (`TaskCreate`, `TaskUpdate`, `TaskGet`, `TaskList`, `TaskOutput`, `TaskStop`) |
 | `agent-hook-schemas/codex` | Codex event schemas, strict wire-format stdout, `mergeCodexHooksFiles`, resolver |
 | `agent-hook-schemas/codex-agents` | Separate Codex collaboration V1 and V2 decoded input and response schemas |
 | `agent-hook-schemas/codex-tasks` | Codex `update_plan` argument, function-call, and output schemas |
+| `agent-hook-schemas/codex-hooks-integration` | `mergeCodexHooksFiles`, `resolveMatchingCodexHandlers`, matcher/if helpers |
 | `agent-hook-schemas/copilot` | GitHub Copilot hook config, stdin/stdout schemas, `mergeCopilotHooksFiles`, resolver |
 | `agent-hook-schemas/copilot-hooks-integration` | `mergeCopilotHooksFiles`, `resolveMatchingCopilotHandlers`, matcher helpers |
 | `agent-hook-schemas/gemini` | Gemini CLI settings hooks, stdin/stdout schemas, `ParseGeminiHookInput` |
@@ -270,6 +287,52 @@ typed without enforcing each item's runtime requirements. The host selects tools
 model overrides, and timeout limits. V2 message handlers return text (empty on
 success in the tagged [implementation](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs)).
 Existing `update_plan` schemas remain in `codex-tasks`.
+
+### Google Antigravity built-in tool schemas
+
+Google Antigravity natively provides 14 core built-in tools (excluding generic MCP gateway tools).
+The library exports Zod schemas, TypeScript types, and single-call parse helpers for all 14 tools
+via `agent-hook-schemas/antigravity` (and the root barrel):
+
+| Tool | Argument Schema & Type | Output / Response Schema |
+|---|---|---|
+| `run_command` | `AntigravityRunCommandToolInputSchema` (`AntigravityRunCommandArgsSchema`) | `AntigravityRunCommandToolResponseSchema` |
+| `view_file` | `AntigravityViewFileToolInputSchema` (`AntigravityViewFileArgsSchema`) | `AntigravityViewFileToolResponseSchema` |
+| `replace_file_content` | `AntigravityReplaceFileContentToolInputSchema` | `AntigravityReplaceFileContentToolResponseSchema` |
+| `write_to_file` | `AntigravityWriteToFileToolInputSchema` (supports `ArtifactMetadata`) | `AntigravityWriteToFileToolResponseSchema` |
+| `manage_task` | `AntigravityManageTaskToolInputSchema` (`list`, `kill`, `status`, `send_input`) | `AntigravityManageTaskToolResponseSchema` |
+| `schedule` | `AntigravityScheduleToolInputSchema` (one-shot timers or recurring cron) | `AntigravityScheduleToolResponseSchema` |
+| `send_message` | `AntigravitySendMessageToolInputSchema` | `AntigravitySendMessageToolResponseSchema` |
+| `invoke_subagent` | `AntigravityInvokeSubagentToolInputSchema` (`Subagents` array) | `AntigravityInvokeSubagentToolResponseSchema` |
+| `define_subagent` | `AntigravityDefineSubagentToolInputSchema` | `AntigravityDefineSubagentToolResponseSchema` |
+| `manage_subagents` | `AntigravityManageSubagentsToolInputSchema` (`list`, `kill`, `kill_all`) | `AntigravityManageSubagentsToolResponseSchema` |
+| `read_url_content` | `AntigravityReadUrlContentToolInputSchema` | `AntigravityReadUrlContentToolResponseSchema` |
+| `search_web` | `AntigravitySearchWebToolInputSchema` | `AntigravitySearchWebToolResponseSchema` |
+| `generate_image` | `AntigravityGenerateImageToolInputSchema` | `AntigravityGenerateImageToolResponseSchema` |
+| `ask_question` | `AntigravityAskQuestionToolInputSchema` | `AntigravityAskQuestionToolResponseSchema` |
+
+Use `ParseAntigravityToolCall` to parse hook stdin tool calls with type narrowing on `name`:
+
+```ts
+import { ParseAntigravityToolCall } from "agent-hook-schemas/antigravity";
+
+const call = ParseAntigravityToolCall({
+  name: "run_command",
+  args: {
+    CommandLine: "bun test",
+    Cwd: "/workspace",
+    WaitMsBeforeAsync: 5000,
+    toolAction: "Running test suite",
+    toolSummary: "Run tests",
+  },
+});
+
+if (call.success && call.data.name === "run_command") {
+  console.log(call.data.args?.CommandLine);
+}
+```
+
+Or validate arguments directly with `ParseAntigravityToolArgs(toolName, args)` or individual helpers like `ParseAntigravityRunCommandArgs(args)`.
 
 ### Hook configuration
 
@@ -377,79 +440,93 @@ Events across platforms that serve equivalent purposes but use different names o
 
 Each platform with config merge support has a parallel integration module with equivalent functions:
 
-| Function | Claude | Codex | Copilot | Gemini |
-|---|---|---|---|---|
-| **Merge config layers** | `mergeClaudeHooksFiles()` | `mergeCodexHooksFiles()` | `mergeCopilotHooksFiles()` | `mergeGeminiHooksFiles()` |
-| **Merge full settings** | `mergeClaudeSettings()` | — | — | — |
-| **Matcher matching** | `claudeMatcherMatches()` | `codexMatcherMatches()` | `copilotMatcherMatches()` | `geminiMatcherMatches()` |
-| **`if` guard eval** | `claudeToolIfMatches()` | `codexToolIfMatches()` | — | — |
-| **Resolve handlers** | `resolveMatchingClaudeHandlers()` | `resolveMatchingCodexHandlers()` | `resolveMatchingCopilotHandlers()` | `resolveMatchingGeminiHandlers()` |
-| **Resolve from stdin** | `resolveMatchingClaudeHandlersFromInput()` | `resolveMatchingCodexHandlersFromInput()` | `resolveMatchingCopilotHandlersFromInput()` | `resolveMatchingGeminiHandlersFromInput()` |
-| **Effective timeout** | `effectiveClaudeHandlerTimeoutSec()` → seconds | `effectiveCodexHandlerTimeoutSec()` → seconds | `effectiveCopilotHandlerTimeoutSec()` → seconds | `effectiveGeminiHandlerTimeoutMs()` → milliseconds |
-| **Sequential groups** | — | — | — | `resolveMatchingGeminiHandlerGroups()` |
-| **Permission rules** | `evaluateSettingsPermissions()` | — | — | — |
-| **Validate settings** | `parseClaudeSettings()` | `parseCodexHooksFile()` | `parseCopilotHooksFile()` | `parseGeminiSettings()` |
+| Function | Claude | Codex | Copilot | Gemini | Google Antigravity |
+|---|---|---|---|---|---|
+| **Merge config layers** | `mergeClaudeHooksFiles()` | `mergeCodexHooksFiles()` | `mergeCopilotHooksFiles()` | `mergeGeminiHooksFiles()` | `mergeAntigravityHooksFiles()` |
+| **Merge full settings** | `mergeClaudeSettings()` | — | — | — | — |
+| **Matcher matching** | `claudeMatcherMatches()` | `codexMatcherMatches()` | `copilotMatcherMatches()` | `geminiMatcherMatches()` | `antigravityMatcherMatches()` |
+| **`if` guard eval** | `claudeToolIfMatches()` | `codexToolIfMatches()` | — | — | — |
+| **Resolve handlers** | `resolveMatchingClaudeHandlers()` | `resolveMatchingCodexHandlers()` | `resolveMatchingCopilotHandlers()` | `resolveMatchingGeminiHandlers()` | `resolveMatchingAntigravityHandlers()` |
+| **Resolve from stdin** | `resolveMatchingClaudeHandlersFromInput()` | `resolveMatchingCodexHandlersFromInput()` | `resolveMatchingCopilotHandlersFromInput()` | `resolveMatchingGeminiHandlersFromInput()` | — |
+| **Effective timeout** | `effectiveClaudeHandlerTimeoutSec()` → seconds | `effectiveCodexHandlerTimeoutSec()` → seconds | `effectiveCopilotHandlerTimeoutSec()` → seconds | `effectiveGeminiHandlerTimeoutMs()` → milliseconds | `effectiveAntigravityHandlerTimeoutSec()` → seconds |
+| **Sequential groups** | — | — | — | `resolveMatchingGeminiHandlerGroups()` | — |
+| **Permission rules** | `evaluateSettingsPermissions()` | — | — | — | — |
+| **Validate settings** | `parseClaudeSettings()` | `parseCodexHooksFile()` | `parseCopilotHooksFile()` | `parseGeminiSettings()` | `parseAntigravityHooksFile()` |
 
 ### Hook Stdin Base Fields
 
 Fields available on hook stdin payloads across platforms:
 
-| Field | Claude | Codex | Copilot | Gemini | Cursor |
-|---|---|---|---|---|---|
-| `session_id` | Yes | Yes | VS-compatible format | Yes | Yes |
-| `sessionId` | — | — | camelCase format | — | — |
-| `transcript_path` | `string` | `string \| null` | VS-compatible format | `string` | `string \| null` |
-| `transcriptPath` | — | — | camelCase stop/subagent/compact | — | — |
-| `cwd` | Yes | Yes | Yes | Yes | Yes (some events) |
-| `model` | Yes (SessionStart) | Yes | — | — | Yes |
-| `permission_mode` | Yes | Yes | — | — | — |
-| `hook_event_name` | PascalCase | PascalCase | VS-compatible format | PascalCase | camelCase |
-| `tool_name` | Yes (tool events) | Yes (tool events) | VS-compatible format | Yes (`BeforeTool`/`AfterTool`) | Yes (tool events) |
-| `toolName` | — | — | camelCase tool events | — | — |
-| `tool_input` | `Record<string, unknown>` | Typed per tool | VS-compatible format | `Record<string, unknown>` | `Record<string, unknown>` |
-| `toolArgs` | — | — | camelCase tool events | — | — |
-| `tool_response` | Yes (PostToolUse) | Yes (PostToolUse) | — | Yes (`AfterTool`) | — |
-| `tool_output` | — | — | — | — | `string \| object` (postToolUse; objects retained for capture compatibility) |
-| `model_id` / `model_params` | — | — | — | — | Typed model ID and parameter list |
-| `toolResult` / `tool_result` | — | — | success result shape | — | — |
-| `stop_hook_active` | Yes (Stop) | Yes (Stop) | — | Yes (`AfterAgent`) | — |
-| `timestamp` | — | — | number (camel) / string (VS) | Yes | — |
-| `turn_id` | — | Yes | — | — | — |
-| `agent_id`/`agent_type` | Yes | — | — | — | — |
-| `conversation_id` | — | — | — | — | Yes |
-| `generation_id` | — | — | — | — | Yes |
-| `cursor_version` | — | — | — | — | Yes |
-| `workspace_roots` | — | — | — | — | Yes |
+| Field | Claude | Codex | Copilot | Gemini | Cursor | Google Antigravity |
+|---|---|---|---|---|---|---|
+| `session_id` | Yes | Yes | VS-compatible format | Yes | Yes | — |
+| `sessionId` | — | — | camelCase format | — | — | — |
+| `conversationId` | — | — | — | — | — | `string` |
+| `transcript_path` | `string` | `string \| null` | VS-compatible format | `string` | `string \| null` | — |
+| `transcriptPath` | — | — | camelCase stop/subagent/compact | — | — | `string` |
+| `cwd` | Yes | Yes | Yes | Yes | Yes (some events) | — |
+| `workspacePaths` | — | — | — | — | — | `string[]` |
+| `artifactDirectoryPath` | — | — | — | — | — | `string` |
+| `model` | Yes (SessionStart) | Yes | — | — | Yes | — |
+| `modelName` | — | — | — | — | — | `string` |
+| `permission_mode` | Yes | Yes | — | — | — | — |
+| `hook_event_name` | PascalCase | PascalCase | VS-compatible format | PascalCase | camelCase | — (protocol event) |
+| `tool_name` | Yes (tool events) | Yes (tool events) | VS-compatible format | Yes (`BeforeTool`/`AfterTool`) | Yes (tool events) | — (via `toolCall.name`) |
+| `toolName` | — | — | camelCase tool events | — | — | — |
+| `toolCall` | — | — | — | — | — | `{ name, args }` |
+| `stepIdx` | — | — | — | — | — | `number` (tool events) |
+| `tool_input` | `Record<string, unknown>` | Typed per tool | VS-compatible format | `Record<string, unknown>` | `Record<string, unknown>` | — (via `toolCall.args`) |
+| `toolArgs` | — | — | camelCase tool events | — | — | — |
+| `tool_response` | Yes (PostToolUse) | Yes (PostToolUse) | — | Yes (`AfterTool`) | — | — |
+| `tool_output` | — | — | — | — | `string \| object` (postToolUse) | — |
+| `model_id` / `model_params` | — | — | — | — | Typed model ID and parameter list | — |
+| `toolResult` / `tool_result` | — | — | success result shape | — | — | — |
+| `stop_hook_active` | Yes (Stop) | Yes (Stop) | — | Yes (`AfterAgent`) | — | — |
+| `timestamp` | — | — | number (camel) / string (VS) | Yes | — | — |
+| `turn_id` | — | Yes | — | — | — | — |
+| `agent_id`/`agent_type` | Yes | — | — | — | — | — |
+| `conversation_id` | — | — | — | — | Yes | — |
+| `generation_id` | — | — | — | — | Yes | — |
+| `cursor_version` | — | — | — | — | Yes | — |
+| `workspace_roots` | — | — | — | — | Yes | — |
+| `error` | — | — | — | — | — | `PostToolUse`, `Stop` |
+| `invocationNum` / `initialNumSteps` | — | — | — | — | — | `PreInvocation`, `PostInvocation` |
+| `executionNum` / `terminationReason` | — | — | — | — | — | `Stop` |
+| `fullyIdle` | — | — | — | — | — | `Stop` |
 
 ### Hook Stdout Comparison
 
 How hook scripts communicate results back to the platform:
 
-| Field | Claude | Codex | Copilot | Gemini | Cursor |
-|---|---|---|---|---|---|
-| `continue` | Optional | Default `true` | — | Optional | beforeSubmitPrompt; sessionStart parses but does not enforce it |
-| `decision` | `"block"` | `"approve" \| "block"` (PreToolUse), `"block"` (others) | `"block" \| "allow"` (agent stops) | `"allow" \| "deny" \| "block"` | — |
-| `reason` | Optional string | `string \| null` | Required for stop `block` | Optional string | — |
-| `hookSpecificOutput` | Discriminated on `hookEventName` | Strict wire schemas per event | — | Shared + Gemini extension | — |
-| `systemMessage` | Optional | `string \| null` | — | Optional | — |
-| `suppressOutput` | Optional | Default `false` | — | Optional | — |
-| `stopReason` | Optional | `string \| null` | — | Optional | — |
-| `permissionDecision` | via `hookSpecificOutput` | via `hookSpecificOutput` | `allow \| deny \| ask` | — | — |
-| `permissionDecisionReason` | via `hookSpecificOutput` | via `hookSpecificOutput` | Required for `deny` | — | — |
-| `modifiedArgs` | — | — | Optional tool arg replacement | — | — |
-| `modifiedResult` | — | — | Optional successful post-tool result replacement | — | — |
-| `permission` / `updated_input` | — | — | — | — | Event-specific permission decision / tool input replacement |
-| `additional_context` / `updated_mcp_tool_output` | — | — | — | — | Post-tool context / MCP output replacement |
-| `followup_message` / `pluginPaths` | — | — | — | — | Stop follow-up / workspace plugin directories |
-| `behavior` | — | — | `allow \| deny` (`permissionRequest`) | — | — |
-| `additionalContext` | Top-level or event-specific | via `hookSpecificOutput` | Session/notification/subagent/failure/post-tool | via `hookSpecificOutput` | — |
-| `hookSpecificOutput.updatedInput` | Optional | `object \| null` | — | — | — |
-| `hookSpecificOutput.updatedMCPToolOutput` | Optional (PostToolUse) | `object \| null` (PostToolUse) | — | — | — |
-| `hookSpecificOutput.tool_input` | — | — | — | Optional (Gemini-only) | — |
-| `hookSpecificOutput.llm_request` | — | — | — | Optional (Gemini-only) | — |
-| `hookSpecificOutput.toolConfig` | — | — | — | Optional (Gemini-only) | — |
-| `hookSpecificOutput.tailToolCallRequest` | — | — | — | Optional (Gemini-only) | — |
-| `watchPaths` | Yes (Claude-only) | — | — | — | — |
+| Field | Claude | Codex | Copilot | Gemini | Cursor | Google Antigravity |
+|---|---|---|---|---|---|---|
+| `continue` | Optional | Default `true` | — | Optional | beforeSubmitPrompt; sessionStart parses | — |
+| `decision` | `"block"` | `"approve" \| "block"` (PreToolUse), `"block"` (others) | `"block" \| "allow"` (agent stops) | `"allow" \| "deny" \| "block"` | — | `"allow" \| "deny" \| "ask" \| "force_ask" \| "deny_unless_prior_grant"` (PreToolUse), `"continue"` (Stop) |
+| `reason` | Optional string | `string \| null` | Required for stop `block` | Optional string | — | Optional string (PreToolUse, Stop) |
+| `permissionOverrides` | — | — | — | — | — | `string[]` (PreToolUse) |
+| `overwrite` | — | — | — | — | — | `JsonObject` (PreToolUse tool args replacement) |
+| `injectSteps` | — | — | — | — | — | Array of `{ toolCall?, userMessage?, ephemeralMessage? }` (Pre/PostInvocation) |
+| `terminationBehavior` | — | — | — | — | — | `"force_continue" \| "terminate" \| ""` (PostInvocation) |
+| `hookSpecificOutput` | Discriminated on `hookEventName` | Strict wire schemas per event | — | Shared + Gemini extension | — | — |
+| `systemMessage` | Optional | `string \| null` | — | Optional | — | — |
+| `suppressOutput` | Optional | Default `false` | — | Optional | — | — |
+| `stopReason` | Optional | `string \| null` | — | Optional | — | — |
+| `permissionDecision` | via `hookSpecificOutput` | via `hookSpecificOutput` | `allow \| deny \| ask` | — | — | via `decision` |
+| `permissionDecisionReason` | via `hookSpecificOutput` | via `hookSpecificOutput` | Required for `deny` | — | — | via `reason` |
+| `modifiedArgs` | — | — | Optional tool arg replacement | — | — | — |
+| `modifiedResult` | — | — | Optional successful post-tool result replacement | — | — | — |
+| `permission` / `updated_input` | — | — | — | — | Event-specific permission decision / tool input replacement | — |
+| `additional_context` / `updated_mcp_tool_output` | — | — | — | — | Post-tool context / MCP output replacement | — |
+| `followup_message` / `pluginPaths` | — | — | — | — | Stop follow-up / workspace plugin directories | — |
+| `behavior` | — | — | `allow \| deny` (`permissionRequest`) | — | — | — |
+| `additionalContext` | Top-level or event-specific | via `hookSpecificOutput` | Session/notification/subagent/failure/post-tool | via `hookSpecificOutput` | — | — |
+| `hookSpecificOutput.updatedInput` | Optional | `object \| null` | — | — | — | — |
+| `hookSpecificOutput.updatedMCPToolOutput` | Optional (PostToolUse) | `object \| null` (PostToolUse) | — | — | — | — |
+| `hookSpecificOutput.tool_input` | — | — | — | Optional (Gemini-only) | — | — |
+| `hookSpecificOutput.llm_request` | — | — | — | Optional (Gemini-only) | — | — |
+| `hookSpecificOutput.toolConfig` | — | — | — | Optional (Gemini-only) | — | — |
+| `hookSpecificOutput.tailToolCallRequest` | — | — | — | Optional (Gemini-only) | — | — |
+| `watchPaths` | Yes (Claude-only) | — | — | — | — | — |
 
 ### Task Schema Comparison
 
@@ -500,7 +577,32 @@ entries continue to export the same schemas and helpers for compatibility.
 Integration code imports the internal schemas directly. The dependency test
 rejects runtime import cycles, and package smoke tests check root, platform and
 integration imports in fresh Node and Bun processes. Keep lazy schema `.options`
-access inside integration functions as an additional initialization safeguard.
+## Testing
+
+The project uses [Bun](https://bun.sh) for parallel testing and coverage gating:
+
+```bash
+# Run all tests with bounded file-level workers
+bun test --parallel=4
+
+# Run specific test suites
+bun test antigravity-tools.test.ts antigravity.test.ts dist-smoke.test.ts
+
+# Type-check library, tests, and development scripts
+bun run test:types
+
+# Run build, smoke tests, and 100% source coverage gate
+bun run test:coverage
+```
+
+## Contributing
+
+Contributions are welcome! Please follow these standards:
+
+1. **Verify Before Committing**: Run `bun run build && bun test --parallel=4 && bun run test:types`.
+2. **Maintain Full Coverage**: Any new schema or helper must be covered; run `bun run test:coverage` to confirm the 100% function and line coverage gate passes.
+3. **Forward Compatibility**: Always use `.loose()` for input schemas to ensure unknown fields from future platform versions pass through.
+4. **Commit Conventions**: Use conventional commits (e.g. `feat(antigravity): add tool schemas`, `fix(claude): update event matcher`).
 
 ## License
 

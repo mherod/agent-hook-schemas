@@ -7,6 +7,12 @@ import {
 } from "./common.ts";
 
 // ---------------------------------------------------------------------------
+// Tool inputs / responses — see antigravity-tool-schemas.ts
+// ---------------------------------------------------------------------------
+
+export * from "./antigravity-tool-schemas.ts";
+
+// ---------------------------------------------------------------------------
 // Google Antigravity external lifecycle hooks — configuration & stdin/stdout
 // (see Antigravity hooks reference)
 // ---------------------------------------------------------------------------

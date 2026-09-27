@@ -79,4 +79,25 @@ describe("dist bundle smoke test", () => {
     const { AntigravityHookEventNameSchema } = await import("./dist/antigravity.js");
     expect(AntigravityHookEventNameSchema.options.length).toBeGreaterThan(0);
   });
+
+  test("Antigravity built-in tool schemas and parse helpers work through built bundle", async () => {
+    const root = await import("agent-hook-schemas");
+    const antigravity = await import("agent-hook-schemas/antigravity");
+
+    expect(antigravity.AntigravityBuiltinToolNameSchema.options).toHaveLength(14);
+    expect(root.AntigravityBuiltinToolNameSchema.options).toHaveLength(14);
+
+    const call = {
+      name: "run_command" as const,
+      args: {
+        CommandLine: "bun test",
+        Cwd: "/workspace",
+        WaitMsBeforeAsync: 5000,
+        toolAction: "Running tests",
+        toolSummary: "Run tests",
+      },
+    };
+    expect(antigravity.ParseAntigravityToolCall(call).success).toBe(true);
+    expect(root.ParseAntigravityToolCall(call).success).toBe(true);
+  });
 });
