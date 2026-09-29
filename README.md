@@ -8,7 +8,7 @@ Supports [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI 
 
 - **Multi-Platform Coverage** — Typed schemas for Claude Code (33 events), OpenAI Codex (12 events), GitHub Copilot (14 events), Gemini CLI (11 events), Cursor (21 events), and Google Antigravity (5 events).
 - **Single-Call Input Parsers** — `ParseHookInput()`, `ParseCodexHookInput()`, `ParseCopilotHookInput()`, `ParseGeminiHookInput()`, `ParseCursorHookInput()`, and `ParseAntigravityHookInput()` validate incoming payloads into discriminated TypeScript types in one call.
-- **Built-in Tool & Agent Schemas** — Complete argument and response validation for 46 Claude Code tools, 14 Google Antigravity built-in tools, Codex collaboration (V1 & V2) and `update_plan`, and Claude task management tools (`TaskCreate`, `TaskUpdate`, etc.).
+- **Built-in Tool & Agent Schemas** — Schemas for 46 Claude Code tools, 14 Google Antigravity built-in tools, Codex collaboration (V1 & V2) and `update_plan`, 19 core Codex tools, 51 Codex desktop app tools, and Claude task management tools (`TaskCreate`, `TaskUpdate`, etc.). Response validation follows the available contracts; see the Codex coverage limits below.
 - **Config Merging & Resolution** — Layered configuration mergers (`mergeClaudeHooksFiles`, `mergeCodexHooksFiles`, `mergeCopilotHooksFiles`, `mergeGeminiHooksFiles`, `mergeAntigravityHooksFiles`) that combine user, workspace, and plugin settings in priority order with regex matchers and `if` guards.
 - **Forward-Compatible Design** — Uses `.loose()` on input payloads so future platform versions with new metadata fields pass through without breaking validation.
 - **Zero External Runtime Overhead** — Written in pure TypeScript with `zod` v4+ as the sole dependency; outputs dual-published ESM and `.d.ts` type declarations.
@@ -192,6 +192,8 @@ const copilotResult = CopilotHooksFileSchema.safeParse(hooksJson);
 | `agent-hook-schemas/codex` | Codex event schemas, strict wire-format stdout, `mergeCodexHooksFiles`, resolver |
 | `agent-hook-schemas/codex-agents` | Separate Codex collaboration V1 and V2 decoded input and response schemas |
 | `agent-hook-schemas/codex-tasks` | Codex `update_plan` argument, function-call, and output schemas |
+| `agent-hook-schemas/codex-tools` | Core Codex tool argument schemas, typed dispatch, and declared response schemas |
+| `agent-hook-schemas/codex-app-tools` | Codex desktop tool argument schemas, typed dispatch, and shared MCP response envelope |
 | `agent-hook-schemas/codex-hooks-integration` | `mergeCodexHooksFiles`, `resolveMatchingCodexHandlers`, matcher/if helpers |
 | `agent-hook-schemas/copilot` | GitHub Copilot hook config, stdin/stdout schemas, `mergeCopilotHooksFiles`, resolver |
 | `agent-hook-schemas/copilot-hooks-integration` | `mergeCopilotHooksFiles`, `resolveMatchingCopilotHandlers`, matcher helpers |
@@ -287,6 +289,72 @@ typed without enforcing each item's runtime requirements. The host selects tools
 model overrides, and timeout limits. V2 message handlers return text (empty on
 success in the tagged [implementation](https://github.com/openai/codex/blob/rust-v0.153.4/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs)).
 Existing `update_plan` schemas remain in `codex-tasks`.
+
+### Core Codex and desktop app tools
+
+The [September 29 tool audit](docs/codex-tools-audit-2026-09-29.md) records the
+session contracts behind these schemas. Both modules are also exported from the
+root and `agent-hook-schemas/codex`.
+
+Core coverage includes `exec_command`, `write_stdin`, `apply_patch`, `view_image`,
+`exec`, `wait`, goal management, both question tools, MCP resource helpers,
+plugin installation requests, `clock.curr_time`, `clock.sleep`,
+`image_gen.imagegen`, and `web.run`.
+App coverage includes all 51 exposed desktop tools for tasks, Pages, Spaces,
+sharing, sidebar organization, automations, usage, voice, and workspace utilities.
+Individual connectors and browser automation plugins have separate contracts.
+
+```ts
+import {
+  ParseCodexBuiltinToolInput,
+  ParseCodexBuiltinToolArgs,
+  ParseCodexBuiltinToolResponse,
+} from "agent-hook-schemas/codex-tools";
+import {
+  ParseCodexAppToolInput,
+  ParseCodexAppToolArgs,
+  ParseCodexAppToolResponse,
+} from "agent-hook-schemas/codex-app-tools";
+
+const shell = ParseCodexBuiltinToolInput({
+  tool_name: "exec_command",
+  tool_input: { cmd: "pwd", workdir: "/workspace" },
+});
+const code = ParseCodexBuiltinToolArgs("exec", "text(1);");
+const output = ParseCodexBuiltinToolResponse("exec_command", {
+  output: "/workspace\n", wall_time_seconds: 0.01, exit_code: 0,
+});
+const page = ParseCodexAppToolInput({
+  tool_name: "read_page", tool_input: { page_id: "page-id" },
+});
+const task = ParseCodexAppToolArgs("create_thread", {
+  prompt: "Review the parser", target: { type: "projectless" },
+});
+const result = ParseCodexAppToolResponse({
+  content: [{ type: "text", text: "Done" }],
+});
+```
+
+The `*ToolInputSchema` exports provide direct validation, the `*ToolInputSchemas`
+maps expose name-to-schema lookup, and the `*ToolInput` unions narrow arguments
+by `tool_name`. Use basenames for `functions.*` and `mcp__codex_app__*` calls;
+retain the qualified clock, image-generation, and web names shown above.
+Decode JSON arguments before parsing. `exec` and `apply_patch` instead take
+raw source and patch strings; these parsers check their type without executing
+code or validating the embedded grammar.
+
+Inputs retain unknown fields and do not inject host defaults. Generic hook
+parsing remains forward-compatible; call a dedicated tool parser when argument
+validation is required. Parsing does not establish tool availability, access,
+permission, successful execution, or compliance with host usage rules.
+
+Response schemas cover the declared `exec_command`, `write_stdin`,
+`view_image`, and `clock.curr_time` results. Other core responses are unspecified
+by the session and have no invented response schema. App responses validate the
+shared MCP content envelope; app-specific text and structured results remain
+opaque. `automation_update` has typed view/create variants; other modes preserve
+opaque object fields. Use `CodexAppKnownAutomationUpdateToolInputSchema` when
+only those fully specified variants are acceptable.
 
 ### Google Antigravity built-in tool schemas
 

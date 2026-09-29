@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 describe("dist bundle smoke test", () => {
   for (const runtime of ["node", process.execPath]) {
     for (const entry of ["agent-hook-schemas", "agent-hook-schemas/codex", "agent-hook-schemas/copilot",
+      "agent-hook-schemas/codex-tools", "agent-hook-schemas/codex-app-tools",
       "agent-hook-schemas/codex-hooks-integration", "agent-hook-schemas/copilot-hooks-integration"]) {
       test(`${runtime === "node" ? "Node" : "Bun"}: ${entry} initializes first in a fresh process`, () => {
         const result = spawnSync(runtime, ["scripts/check-bundle-imports.mjs", entry], {
@@ -40,6 +41,27 @@ describe("dist bundle smoke test", () => {
     expect(codex.ParseCodexCollaborationV2ToolInput(call)).toEqual({ success: true, data: call });
     expect(root.ParseCodexCollaborationV2ToolInput(call)).toEqual({ success: true, data: call });
     expect(codex.ParseCodexCollaborationV1ToolResponse("spawn_agent", { agent_id: "agent-1", nickname: null }).success).toBe(true);
+  });
+
+  test("core and app tools parse through root, Codex and dedicated built entries", async () => {
+    const root = await import("agent-hook-schemas");
+    const codex = await import("agent-hook-schemas/codex");
+    const core = await import("agent-hook-schemas/codex-tools");
+    const app = await import("agent-hook-schemas/codex-app-tools");
+    const command = { tool_name: "exec_command" as const, tool_input: { cmd: "pwd" } };
+    const page = { tool_name: "read_page" as const, tool_input: { page_id: "page" } };
+    for (const entry of [root, codex, core]) {
+      expect(entry.CodexBuiltinToolNameSchema.options).toHaveLength(19);
+      expect(entry.ParseCodexBuiltinToolInput(command)).toEqual({ success: true, data: command });
+      expect(entry.ParseCodexBuiltinToolArgs("exec", "text(1);").success).toBe(true);
+    }
+    for (const entry of [root, codex, app]) {
+      expect(entry.CodexAppToolNameSchema.options).toHaveLength(51);
+      expect(entry.ParseCodexAppToolInput(page)).toEqual({ success: true, data: page });
+      expect(entry.ParseCodexAppToolResponse({ content: [{ type: "text", text: "Done" }] }).success).toBe(true);
+    }
+    expect(root.CodexAppReadPageToolInputSchema).toBe(app.CodexAppReadPageToolInputSchema);
+    expect(codex.CodexExecCommandToolInputSchema).toBe(core.CodexExecCommandToolInputSchema);
   });
 
   test("HookEventNameSchema.options is non-empty at bundle load", async () => {

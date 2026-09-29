@@ -13,6 +13,8 @@ export default defineConfig({
     "codex-agents.ts",
     "codex-hooks-integration.ts",
     "codex-tasks.ts",
+    "codex-tools.ts",
+    "codex-app-tools.ts",
     "common.ts",
     "copilot.ts",
     "copilot-hooks-integration.ts",

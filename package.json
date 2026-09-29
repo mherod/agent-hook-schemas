@@ -43,6 +43,14 @@
       "types": "./dist/codex-tasks.d.ts",
       "import": "./dist/codex-tasks.js"
     },
+    "./codex-tools": {
+      "types": "./dist/codex-tools.d.ts",
+      "import": "./dist/codex-tools.js"
+    },
+    "./codex-app-tools": {
+      "types": "./dist/codex-app-tools.d.ts",
+      "import": "./dist/codex-app-tools.js"
+    },
     "./codex-hooks-integration": {
       "types": "./dist/codex-hooks-integration.d.ts",
       "import": "./dist/codex-hooks-integration.js"

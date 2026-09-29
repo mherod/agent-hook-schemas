@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 // Each invocation starts with an empty module cache. Exercise the selected
 // entry before importing the others so they cannot mask an initialization bug.
 const first = await import(process.argv[2]);
+if (first.ParseCodexBuiltinToolArgs) {
+  assert.equal(first.ParseCodexBuiltinToolArgs("exec_command", { cmd: "pwd" }).success, true);
+}
+if (first.ParseCodexAppToolArgs) {
+  assert.equal(first.ParseCodexAppToolArgs("read_page", { page_id: "page" }).success, true);
+}
 for (const merge of [first.mergeCodexHooksFiles, first.mergeCopilotHooksFiles]) {
   if (merge) assert.deepEqual(merge([]), { ok: true, config: {} });
 }
